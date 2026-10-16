@@ -16,6 +16,7 @@ import (
 	"github.com/juthrbog/spotui/internal/config"
 	"github.com/juthrbog/spotui/internal/engine"
 	"github.com/juthrbog/spotui/internal/ui"
+	"github.com/juthrbog/spotui/internal/version"
 	"github.com/juthrbog/spotui/internal/webapi"
 )
 
@@ -32,7 +33,13 @@ func main() {
 func run() error {
 	logout := flag.Bool("logout", false, "forget the saved Spotify logins and exit")
 	debug := flag.Bool("debug", false, "write debug messages to the log file")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version.String())
+		return nil
+	}
 
 	paths, err := config.ResolvePaths()
 	if err != nil {
@@ -68,6 +75,7 @@ func run() error {
 		level = slog.LevelDebug
 	}
 	logger := slog.New(slog.NewTextHandler(logFile, &slog.HandlerOptions{Level: level}))
+	logger.Info("starting", "version", version.String())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -1,0 +1,248 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Build and check the binaries, without a release, when the build changes.
+  pull_request:
+    paths:
+      - "build/**"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned to a commit SHA, with the version in a comment.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # Test and scan with the latest patch of this minor version, so
+          # standard library fixes apply.
+          go-version: "1.27.x"
+          check-latest: true
+
+      # go-librespot decodes and plays audio through these C libraries.
+      - name: Install audio libraries
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev libogg-dev libvorbis-dev libflac-dev libmpg123-dev
+
+      # A tag publishes binaries, so the code must pass the same checks as CI
+      # and the vulnerability scan first.
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -shuffle=on ./...
+
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - target: linux-amd64
+            runner: ubuntu-24.04
+          - target: linux-arm64
+            runner: ubuntu-24.04
+          - target: windows-amd64
+            runner: ubuntu-24.04
+          - target: darwin-arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The Linux and Windows builds run in Docker and bring their own Go.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: runner.os == 'macOS'
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+
+      - name: Install pkg-config
+        if: runner.os == 'macOS'
+        run: command -v pkg-config || brew install pkgconf
+
+      - name: Set the version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=snapshot" >> "$GITHUB_ENV"
+          fi
+
+      # build.sh builds the Linux binaries in a Debian 10 container and the
+      # Windows binary with MinGW. vcpkg builds the audio libraries as
+      # static libraries for every target. See build/.
+      - name: Build
+        run: build/build.sh "${{ matrix.target }}"
+
+      - name: Package
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          platform="${TARGET/-/_}"
+          mkdir -p release
+          if [[ "$TARGET" == windows-* ]]; then
+            cp README.md LICENSE "dist/$platform/"
+            (cd "dist/$platform" && zip -q "$GITHUB_WORKSPACE/release/spotui_${VERSION}_${platform}.zip" spotui.exe README.md LICENSE)
+          else
+            tar -czf "release/spotui_${VERSION}_${platform}.tar.gz" \
+              -C "$PWD/dist/$platform" spotui \
+              -C "$PWD" README.md LICENSE
+          fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: spotui-${{ matrix.target }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  verify:
+    name: Run on ${{ matrix.target }}
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - target: linux-amd64
+            runner: ubuntu-24.04
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+          - target: windows-amd64
+            runner: windows-latest
+          - target: darwin-arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: spotui-${{ matrix.target }}
+
+      # The binary needs only glibc 2.28 or later and libasound.so.2.
+      - name: Run spotui -version (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2t64
+          tar -xzf spotui_*.tar.gz
+          ldd ./spotui
+          glibc="$(objdump -T ./spotui | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
+          echo "Newest glibc symbol: $glibc"
+          printf '%s\n' "$glibc" GLIBC_2.28 | sort -C -V || { echo "The binary needs a glibc newer than 2.28"; exit 1; }
+          ./spotui -version
+
+      # The binary must use only the libraries and frameworks of macOS.
+      - name: Run spotui -version (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          tar -xzf spotui_*.tar.gz
+          otool -L ./spotui
+          if otool -L ./spotui | tail -n +2 | grep -Ev '^[[:space:]]+(/usr/lib/|/System/Library/)'; then
+            echo "The binary links a library that is not part of macOS"
+            exit 1
+          fi
+          ./spotui -version
+
+      # A missing DLL stops spotui.exe before it prints anything.
+      - name: Run spotui -version (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive -Path (Get-ChildItem spotui_*.zip).FullName -DestinationPath .
+          .\spotui.exe -version
+
+  publish:
+    name: Publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # sign the provenance attestation
+      attestations: write # store the provenance attestation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: spotui-*
+          path: release
+          merge-multiple: true
+
+      - name: Write checksums
+        working-directory: release
+        run: sha256sum *.tar.gz *.zip > checksums.txt
+
+      # Users can check where an archive came from with
+      # "gh attestation verify <archive> --repo juthrbog/spotui".
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: release/checksums.txt
+
+      # The release notes list the pull requests since the last release.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
+
+      # The tap gets the new formula through a deploy key of
+      # juthrbog/homebrew-tap. Its private key is the HOMEBREW_TAP_SSH_KEY
+      # secret of this repository.
+      - name: Check Homebrew publication setup
+        id: tap
+        env:
+          TAP_SSH_KEY: ${{ secrets.HOMEBREW_TAP_SSH_KEY }}
+        run: |
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Prerelease: leaving the stable Homebrew formula unchanged.'
+          elif [[ -z "$TAP_SSH_KEY" ]]; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::Homebrew publication skipped. Configure the HOMEBREW_TAP_SSH_KEY secret.'
+          else
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write the Homebrew formula
+        if: steps.tap.outputs.enabled == 'true'
+        run: build/formula.sh "${GITHUB_REF_NAME#v}" release/checksums.txt > spotui.rb
+
+      - name: Checkout Homebrew tap
+        if: steps.tap.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: juthrbog/homebrew-tap
+          ref: main
+          ssh-key: ${{ secrets.HOMEBREW_TAP_SSH_KEY }}
+          path: .homebrew-tap
+
+      - name: Update Homebrew formula
+        if: steps.tap.outputs.enabled == 'true'
+        run: |
+          mkdir -p .homebrew-tap/Formula
+          cp spotui.rb .homebrew-tap/Formula/spotui.rb
+          git -C .homebrew-tap config user.name 'github-actions[bot]'
+          git -C .homebrew-tap config user.email \
+            '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C .homebrew-tap add Formula/spotui.rb
+          if ! git -C .homebrew-tap diff --cached --quiet; then
+            git -C .homebrew-tap commit -m "Update spotui to $GITHUB_REF_NAME"
+            git -C .homebrew-tap push
+          fi

@@ -80,12 +80,23 @@ func link(url string, w int) string {
 // openBrowser opens url in the default browser. It fails quietly, because the
 // UI always shows the URL too. Tests replace it.
 var openBrowser = func(url string) {
-	name := "xdg-open"
-	if runtime.GOOS == "darwin" {
-		name = "open"
-	}
-	cmd := exec.Command(name, url) // #nosec G204 -- fixed program, URL from Spotify login flow
+	name, args := browserCommand(runtime.GOOS, url)
+	cmd := exec.Command(name, args...) // #nosec G204 -- fixed program, URL from Spotify login flow
 	if err := cmd.Start(); err == nil {
 		go func() { _ = cmd.Wait() }()
+	}
+}
+
+// browserCommand returns the program that opens url on goos. On Windows,
+// rundll32 is used instead of "cmd /c start", because cmd splits the URL at
+// each "&".
+func browserCommand(goos, url string) (string, []string) {
+	switch goos {
+	case "darwin":
+		return "open", []string{url}
+	case "windows":
+		return "rundll32", []string{"url.dll,FileProtocolHandler", url}
+	default:
+		return "xdg-open", []string{url}
 	}
 }
