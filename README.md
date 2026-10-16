@@ -11,25 +11,45 @@ spotui also shows up as a Spotify Connect device. You can control it from the Sp
 You need these items to use spotui:
 
 - A Spotify Premium account. Spotify does not allow playback in third-party players without Premium.
-- Linux on x86-64 or ARM64, with PulseAudio or PipeWire. ALSA also works.
+- One of these systems:
+  - Linux on x86-64 or ARM64, with PulseAudio or PipeWire. ALSA also works.
+  - macOS 12 or later on Apple Silicon.
+  - Windows 10 or later on x64. Use Windows Terminal.
 
 ## Install
 
-### Download a release
-
-Each [release](https://github.com/juthrbog/spotui/releases) has a binary for Linux on x86-64 (`amd64`) and on ARM64 (`arm64`). The binary needs glibc 2.28 or later and the ALSA library (`alsa-lib` on Arch Linux, `libasound2` on Debian and Ubuntu). Most desktop distributions have both.
-
-These commands download version 0.1.0 for x86-64 and install it in `~/.local/bin`. Change `version` and `arch` as necessary:
+### Homebrew (macOS and Linux)
 
 ```sh
-version=0.1.0 arch=amd64
-curl -LO "https://github.com/juthrbog/spotui/releases/download/v${version}/spotui_${version}_linux_${arch}.tar.gz"
-gh attestation verify "spotui_${version}_linux_${arch}.tar.gz" --repo juthrbog/spotui
-tar -xzf "spotui_${version}_linux_${arch}.tar.gz" spotui
+brew install juthrbog/tap/spotui
+```
+
+### Download a release
+
+Each [release](https://github.com/juthrbog/spotui/releases) has these files:
+
+| File | System |
+| --- | --- |
+| `spotui_<version>_linux_amd64.tar.gz` | Linux on x86-64 |
+| `spotui_<version>_linux_arm64.tar.gz` | Linux on ARM64 |
+| `spotui_<version>_darwin_arm64.tar.gz` | macOS on Apple Silicon |
+| `spotui_<version>_windows_amd64.zip` | Windows on x64 |
+
+The Linux binary needs glibc 2.28 or later and the ALSA library (`alsa-lib` on Arch Linux, `libasound2` on Debian and Ubuntu). Most desktop distributions have both. The macOS and Windows binaries need nothing else.
+
+These commands download version 0.1.0 for Linux on x86-64 and install it in `~/.local/bin`. Change `version` and `platform` as necessary:
+
+```sh
+version=0.1.0 platform=linux_amd64
+curl -LO "https://github.com/juthrbog/spotui/releases/download/v${version}/spotui_${version}_${platform}.tar.gz"
+gh attestation verify "spotui_${version}_${platform}.tar.gz" --repo juthrbog/spotui
+tar -xzf "spotui_${version}_${platform}.tar.gz" spotui
 install -D -m 755 spotui ~/.local/bin/spotui
 ```
 
 The `gh attestation verify` command is optional. It makes sure that the GitHub release workflow of this repository built the file. Each release also has a `checksums.txt` file.
+
+On Windows, extract `spotui.exe` from the zip file and run it in Windows Terminal.
 
 ### Build from source
 
@@ -43,6 +63,14 @@ On Arch Linux, this command installs the libraries:
 ```sh
 sudo pacman -S --needed base-devel pkgconf alsa-lib libogg libvorbis flac mpg123
 ```
+
+On macOS, this command installs them:
+
+```sh
+brew install pkgconf libogg libvorbis flac mpg123
+```
+
+On Windows, use the release binary.
 
 To install the latest version from source, run this command:
 
@@ -134,14 +162,14 @@ If a cover shows as an empty box or as strange characters, set `cover_art = "blo
 
 ## Configuration
 
-spotui writes `~/.config/spotui/config.toml` with comments on its first start. The file contains these values:
+spotui writes the configuration file `config.toml` with comments on its first start. The [Files](#files) section gives its location. The file contains these values:
 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `client_id` | empty | Client ID of your Spotify developer app |
 | `redirect_port` | `8898` | Port of the login callback for the Web API |
 | `device_name` | `spotui` | Name in the Spotify Connect device list |
-| `audio_backend` | `pulseaudio` | `pulseaudio` (also for PipeWire) or `alsa` |
+| `audio_backend` | depends on the system | Linux: `pulseaudio` (also for PipeWire) or `alsa`. macOS: `audio-toolbox` or `pulseaudio`. Windows: `wasapi`. The first value is the default. |
 | `audio_device` | empty | Output device. Empty means the system default. |
 | `bitrate` | `320` | Stream quality in kbit/s: `96`, `160`, or `320` |
 | `initial_volume` | `50` | Volume on the first start, from 0 to 100 |
@@ -151,14 +179,22 @@ If you change `redirect_port`, change the redirect URI of your developer app to 
 
 ## Files
 
-spotui keeps its files in these locations:
+spotui keeps its files in two directories:
 
-- `~/.config/spotui/config.toml`: the configuration file.
-- `~/.local/state/spotui/player-state.json`: the Spotify login and the device ID.
-- `~/.local/state/spotui/webapi-token.json`: the Web API login.
-- `~/.local/state/spotui/spotui.log`: the log.
+| System | Configuration file | Other files |
+| --- | --- | --- |
+| Linux | `~/.config/spotui/` | `~/.local/state/spotui/` |
+| macOS | `~/Library/Application Support/spotui/` | `~/Library/Application Support/spotui/` |
+| Windows | `%AppData%\spotui\` | `%LocalAppData%\spotui\` |
 
-The login files contain secrets. spotui makes them readable only by your user.
+The files are:
+
+- `config.toml`: the configuration file.
+- `player-state.json`: the Spotify login and the device ID.
+- `webapi-token.json`: the Web API login.
+- `spotui.log`: the log.
+
+The login files contain secrets. On Linux and macOS, spotui makes them readable only by your user.
 
 To remove both logins, run this command:
 
@@ -168,9 +204,9 @@ spotui -logout
 
 ## Troubleshooting
 
-If you hear no sound, set `audio_backend = "alsa"` in the configuration file and restart spotui.
+If you hear no sound on Linux, set `audio_backend = "alsa"` in the configuration file and restart spotui.
 
-If something fails, read the log at `~/.local/state/spotui/spotui.log`. For more detail, start spotui with `spotui -debug`.
+If something fails, read the log `spotui.log`. The [Files](#files) section gives its location. For more detail, start spotui with `spotui -debug`.
 
 If the Web API login fails with an error about the redirect URI, make sure that the redirect URI in your developer app is exactly `http://127.0.0.1:8898/callback`. Spotify does not accept `localhost` in redirect URIs.
 
@@ -196,9 +232,13 @@ To make a release, do these steps:
 
 1. Merge the changes into the `main` branch.
 2. On the `main` branch, run `task release -- v0.1.0` with the new version. The task makes the tag and pushes it.
-3. The Release workflow tests the code and builds the binaries for `amd64` and `arm64`. It runs each binary on a computer of the same type. Then it publishes the release with the archives, `checksums.txt`, and build attestations.
+3. The Release workflow tests the code and builds the binaries for Linux (`amd64`, `arm64`), macOS (`arm64`), and Windows (`amd64`). It runs each binary on a computer of the same type. Then it publishes the release with the archives, `checksums.txt`, and build attestations, and updates the formula in the [Homebrew tap](https://github.com/juthrbog/homebrew-tap).
 
-The release binaries are built in a Debian 10 container. The container links the audio libraries statically, so the binaries run on most distributions. To build a release binary on your computer, run `task release:build -- amd64`. The build needs Docker and writes the binary to `dist/linux_amd64/spotui`.
+All release binaries link the audio libraries statically. The Linux binaries are built in a Debian 10 container, so they run on most distributions. The Windows binary is built with MinGW in a container, and the macOS binary on a Mac.
+
+To build a release binary on your computer, run `task release:build -- <target>`. The targets are `linux-amd64`, `linux-arm64`, and `windows-amd64`, which need Docker, and `darwin-arm64`, which needs a Mac. The binary goes to `dist/<os>_<arch>/`.
+
+The tap update needs the `HOMEBREW_TAP_SSH_KEY` secret in this repository. It is the private key of a deploy key with write access to the tap. Prerelease tags, such as `v0.2.0-rc.1`, do not update the tap.
 
 ## License
 

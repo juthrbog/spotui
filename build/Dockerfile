@@ -5,7 +5,8 @@
 # Adapted from Dockerfile.build in go-librespot (GPL-3.0):
 # https://github.com/devgianlu/go-librespot
 #
-# Use build/build.sh instead of calling docker directly.
+# Use build/build.sh linux-amd64 (or linux-arm64) instead of calling docker
+# directly.
 FROM --platform=linux/amd64 debian:buster-slim
 
 # Debian 10 (buster) gives an old glibc, so the binary runs on old and new
@@ -29,7 +30,8 @@ ARG TARGET
 RUN apt-get install -y "gcc-$TARGET"
 
 # vcpkg builds the audio libraries for the target. Plain git and no cache
-# mounts, so the file also works with the classic Docker builder.
+# mounts, so the file also works with the classic Docker builder. Keep the
+# vcpkg version the same in Dockerfile.windows and build.sh.
 WORKDIR /build
 RUN git clone --depth 1 --branch 2025.09.17 https://github.com/microsoft/vcpkg.git vcpkg && \
     cd vcpkg && ./bootstrap-vcpkg.sh
@@ -41,8 +43,8 @@ COPY vcpkg.json vcpkg-configuration.json ./
 COPY vcpkg-triplets ./vcpkg-triplets
 RUN vcpkg install --triplet "$TRIPLET"
 
-# The source is mounted at /src when the container runs. VERSION, COMMIT,
-# and DATE come from docker run.
+# The source is mounted at /src when the container runs. LDFLAGS, with the
+# version information, comes from docker run.
 ARG GOCC
 ARG GOARCH
 WORKDIR /src
@@ -50,4 +52,4 @@ ENV CGO_ENABLED=1 CC="$GOCC" GOARCH="$GOARCH" GOAMD64=v1 \
     PKG_CONFIG_PATH="/build/vcpkg_installed/$TRIPLET/lib/pkgconfig" \
     HOME=/tmp GOCACHE=/src/.gocache/build GOMODCACHE=/src/.gocache/mod
 
-CMD [ "/bin/sh", "-c", "go build -trimpath -buildvcs=false -o \"dist/linux_${GOARCH}/spotui\" -ldflags \"-s -w -X github.com/juthrbog/spotui/internal/version.Version=${VERSION} -X github.com/juthrbog/spotui/internal/version.Commit=${COMMIT} -X github.com/juthrbog/spotui/internal/version.Date=${DATE}\" ." ]
+CMD [ "/bin/sh", "-c", "go build -trimpath -buildvcs=false -o \"dist/linux_${GOARCH}/spotui\" -ldflags \"$LDFLAGS\" ." ]

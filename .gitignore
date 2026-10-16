@@ -21,3 +21,7 @@ go.work.sum
 # Release builds (build/build.sh)
 dist/
 .gocache/
+
+# vcpkg on a Mac (build/build.sh darwin-arm64)
+build/.vcpkg/
+build/vcpkg_installed/

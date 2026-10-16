@@ -72,7 +72,7 @@ tasks:
   # ─── Release ────────────────────────────────────────────
 
   release:build:
-    desc: "Build a portable Linux binary in Docker (usage: task release:build -- amd64)"
+    desc: "Build a release binary (usage: task release:build -- linux-amd64)"
     cmds:
       - build/build.sh {{.CLI_ARGS}}
 

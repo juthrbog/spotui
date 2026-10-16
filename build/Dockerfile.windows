@@ -1,0 +1,45 @@
+# Builds the Windows binary of spotui with the MinGW cross compiler. vcpkg
+# builds the audio libraries as static libraries, and the binary links
+# everything statically, so spotui.exe needs only the DLLs of Windows.
+#
+# Based on the windows-vcpkg job in go-librespot (GPL-3.0):
+# https://github.com/devgianlu/go-librespot
+#
+# Use build/build.sh windows-amd64 instead of calling docker directly.
+FROM --platform=linux/amd64 ubuntu:24.04
+
+# vcpkg builds some helper tools for the build machine, so the container needs
+# a native C compiler next to the MinGW cross compiler.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      ca-certificates curl git zip unzip tar pkg-config file cmake ninja-build make \
+      gcc g++ gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
+
+# Keep GO_VERSION the same as the go line in go.mod and in Dockerfile.
+ARG GO_VERSION=1.27.2
+ARG GO_SHA256=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5
+RUN curl -fsSLo go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \
+    echo "${GO_SHA256}  go.tar.gz" | sha256sum -c - && \
+    tar -C /usr/local -xzf go.tar.gz && \
+    rm go.tar.gz
+ENV PATH="/usr/local/go/bin:$PATH" GOTOOLCHAIN=local
+
+WORKDIR /build
+RUN git clone --depth 1 --branch 2025.09.17 https://github.com/microsoft/vcpkg.git vcpkg && \
+    vcpkg/bootstrap-vcpkg.sh -disableMetrics
+ENV VCPKG_ROOT=/build/vcpkg
+ENV PATH="$VCPKG_ROOT:$PATH"
+
+COPY vcpkg.json vcpkg-configuration.json ./
+COPY vcpkg-triplets ./vcpkg-triplets
+RUN vcpkg install --triplet x64-mingw-static
+
+# The source is mounted at /src when the container runs. LDFLAGS, with the
+# version information, comes from docker run.
+WORKDIR /src
+ENV CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc CGO_LDFLAGS=-static \
+    PKG_CONFIG_PATH=/build/vcpkg_installed/x64-mingw-static/lib/pkgconfig \
+    PKG_CONFIG_LIBDIR=/build/vcpkg_installed/x64-mingw-static/lib/pkgconfig \
+    HOME=/tmp GOCACHE=/src/.gocache/build GOMODCACHE=/src/.gocache/mod
+
+CMD [ "/bin/sh", "-c", "go build -trimpath -buildvcs=false -o dist/windows_amd64/spotui.exe -ldflags \"$LDFLAGS\" ." ]
