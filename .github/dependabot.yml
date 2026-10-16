@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    # Wait a week before a version update, so that a bad or compromised
+    # release can be pulled first. Security updates do not wait.
+    cooldown:
+      default-days: 7
+    # Version updates cover the direct dependencies, and three indirect ones:
+    # - golang.org/x/vuln is the govulncheck tool, which go.mod lists as
+    #   indirect.
+    # - golang.org/x/crypto and golang.org/x/net are raised above the old
+    #   versions that go-librespot requires, because those have known
+    #   vulnerabilities.
+    allow:
+      - dependency-type: direct
+      - dependency-name: golang.org/x/vuln
+      - dependency-name: golang.org/x/crypto
+      - dependency-name: golang.org/x/net
+    groups:
+      charm:
+        patterns: ["charm.land/*", "github.com/charmbracelet/*"]
+      golang-x:
+        patterns: ["golang.org/x/*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

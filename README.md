@@ -226,7 +226,9 @@ Liked Songs, playlists, and track lists come from the internal Spotify API throu
 
 ## Development
 
-The `Taskfile.yml` file has the common tasks, for example `task test` and `task lint`. Run `task --list` to see all tasks.
+The `Taskfile.yml` file has the common tasks, for example `task test` and `task lint`. Run `task --list` to see all tasks. `task lint` needs golangci-lint 2.14.0, the version that CI uses.
+
+The workflows pin each GitHub Action to a commit SHA, golangci-lint to a version, and govulncheck as a tool in `go.mod`. Dependabot proposes updates for the Go modules and the GitHub Actions every week, after a cooldown of 7 days. Security updates do not wait.
 
 To make a release, do these steps:
 

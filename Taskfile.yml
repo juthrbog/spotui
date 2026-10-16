@@ -2,6 +2,8 @@ version: "3"
 
 vars:
   BINARY: spotui
+  # Keep it equal to the golangci-lint version in .github/workflows/security.yml.
+  GOLANGCI_LINT_VERSION: 2.14.0
 
 tasks:
   default:
@@ -38,14 +40,17 @@ tasks:
   # ─── Linting ────────────────────────────────────────────
 
   lint:
-    desc: Run linter
+    desc: Run linter (needs the golangci-lint version of CI)
+    preconditions:
+      - sh: '[ "$(golangci-lint version --short 2>/dev/null)" = "{{.GOLANGCI_LINT_VERSION}}" ]'
+        msg: "task lint needs golangci-lint {{.GOLANGCI_LINT_VERSION}}, the version that CI uses. Install that version, for example with mise."
     cmds:
       - golangci-lint run ./...
 
   vuln:
-    desc: Check for known vulnerabilities
+    desc: Scan for known vulnerabilities (govulncheck, pinned in go.mod)
     cmds:
-      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - go tool govulncheck ./...
 
   fmt:
     desc: Format code
