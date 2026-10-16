@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	librespot "github.com/devgianlu/go-librespot"
+
+	"github.com/juthrbog/spotui/internal/atomicfile"
 )
 
 // fileStateStore keeps the player state, including the saved login, in one
@@ -42,26 +43,12 @@ func (s *fileStateStore) Load() (*librespot.AppState, error) {
 // leaves a half-written file.
 func (s *fileStateStore) Save(state *librespot.AppState) error {
 	state.Lock()
-	defer state.Unlock()
-
-	tmp, err := os.CreateTemp(filepath.Dir(s.path), filepath.Base(s.path)+".*.tmp")
+	data, err := json.Marshal(state)
+	state.Unlock()
 	if err != nil {
-		return fmt.Errorf("creating temporary state file: %w", err)
+		return fmt.Errorf("encoding player state: %w", err)
 	}
-	if err := json.NewEncoder(tmp).Encode(state); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
-		return fmt.Errorf("writing player state: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmp.Name())
-		return fmt.Errorf("closing temporary state file: %w", err)
-	}
-	if err := os.Rename(tmp.Name(), s.path); err != nil {
-		_ = os.Remove(tmp.Name())
-		return fmt.Errorf("replacing player state: %w", err)
-	}
-	return nil
+	return atomicfile.Write(s.path, data)
 }
 
 // Logout removes the saved Spotify login from the state file. The next start

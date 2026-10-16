@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -47,27 +50,24 @@ func defaults() Config {
 	return Config{
 		RedirectPort:  8898,
 		DeviceName:    appName,
-		AudioBackend:  "pulseaudio",
+		AudioBackend:  audioBackends(runtime.GOOS)[0],
 		Bitrate:       320,
 		InitialVolume: 50,
 		CoverArt:      "auto",
 	}
 }
 
-// ResolvePaths returns the spotui paths under the XDG config and state
-// directories.
+// ResolvePaths returns the spotui paths. The config file is in the user
+// config directory. The login, the token, and the log are in the state
+// directory of the operating system.
 func ResolvePaths() (Paths, error) {
 	configHome, err := os.UserConfigDir()
 	if err != nil {
 		return Paths{}, fmt.Errorf("finding config directory: %w", err)
 	}
-	stateHome := os.Getenv("XDG_STATE_HOME")
-	if stateHome == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return Paths{}, fmt.Errorf("finding home directory: %w", err)
-		}
-		stateHome = filepath.Join(home, ".local", "state")
+	stateHome, err := stateHome(runtime.GOOS)
+	if err != nil {
+		return Paths{}, err
 	}
 
 	configDir := filepath.Join(configHome, appName)
@@ -101,7 +101,7 @@ func Load(path string) (Config, error) {
 	_, err := toml.DecodeFile(path, &cfg)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		if err := os.WriteFile(path, []byte(template), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte(template(runtime.GOOS)), 0o600); err != nil {
 			return cfg, fmt.Errorf("writing config template: %w", err)
 		}
 	case err != nil:
@@ -120,6 +120,9 @@ func Load(path string) (Config, error) {
 	if cfg.InitialVolume < 0 || cfg.InitialVolume > 100 {
 		return cfg, fmt.Errorf("initial_volume must be between 0 and 100, not %d", cfg.InitialVolume)
 	}
+	if backends := audioBackends(runtime.GOOS); !slices.Contains(backends, cfg.AudioBackend) {
+		return cfg, fmt.Errorf("audio_backend must be one of %q on this system, not %q", backends, cfg.AudioBackend)
+	}
 	switch cfg.CoverArt {
 	case "auto", "kitty", "blocks", "off":
 	default:
@@ -131,7 +134,16 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-const template = `# spotui settings
+// template returns the commented config file that is written on the first
+// start.
+func template(goos string) string {
+	return strings.NewReplacer(
+		"{{backend}}", audioBackends(goos)[0],
+		"{{backend_help}}", backendHelp(goos),
+	).Replace(templateText)
+}
+
+const templateText = `# spotui settings
 
 # Client ID of your own Spotify developer app. spotui uses it only for search
 # and saved albums. Create the app at https://developer.spotify.com/dashboard,
@@ -146,8 +158,8 @@ redirect_port = 8898
 # Name shown in the Spotify Connect device list.
 device_name = "spotui"
 
-# "pulseaudio" (also works with PipeWire) or "alsa".
-audio_backend = "pulseaudio"
+# {{backend_help}}
+audio_backend = "{{backend}}"
 
 # Output device. Empty means the system default.
 audio_device = ""

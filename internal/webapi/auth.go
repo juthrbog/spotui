@@ -13,12 +13,13 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
+
+	"github.com/juthrbog/spotui/internal/atomicfile"
 )
 
 var (
@@ -245,25 +246,11 @@ func (c *Client) loadToken() (*oauth2.Token, error) {
 }
 
 func (c *Client) saveToken(tok *oauth2.Token) error {
-	b, err := json.Marshal(tok) // #nosec G117 -- the token is meant to be saved; CreateTemp makes the file 0600
+	b, err := json.Marshal(tok) // #nosec G117 -- the token is meant to be saved; atomicfile makes the file 0600
 	if err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(c.tokenPath), filepath.Base(c.tokenPath)+".*.tmp")
-	if err != nil {
-		return fmt.Errorf("saving Web API token: %w", err)
-	}
-	if _, err := tmp.Write(b); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
-		return fmt.Errorf("saving Web API token: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmp.Name())
-		return fmt.Errorf("saving Web API token: %w", err)
-	}
-	if err := os.Rename(tmp.Name(), c.tokenPath); err != nil {
-		_ = os.Remove(tmp.Name())
+	if err := atomicfile.Write(c.tokenPath, b); err != nil {
 		return fmt.Errorf("saving Web API token: %w", err)
 	}
 	return nil

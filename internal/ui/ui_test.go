@@ -208,3 +208,18 @@ func checkFrame(t *testing.T, m *Model, w, h int, name string) string {
 	}
 	return frame
 }
+
+func TestBrowserCommand(t *testing.T) {
+	url := "https://accounts.spotify.com/authorize?a=1&b=2"
+	cases := map[string][]string{
+		"linux":   {"xdg-open", url},
+		"darwin":  {"open", url},
+		"windows": {"rundll32", "url.dll,FileProtocolHandler", url},
+	}
+	for goos, want := range cases {
+		name, args := browserCommand(goos, url)
+		if got := append([]string{name}, args...); strings.Join(got, " ") != strings.Join(want, " ") {
+			t.Errorf("%s: %q, want %q", goos, got, want)
+		}
+	}
+}
