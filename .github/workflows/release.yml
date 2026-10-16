@@ -41,8 +41,9 @@ jobs:
       - name: Test
         run: go test -race -shuffle=on ./...
 
+      # go.mod pins govulncheck as a tool.
       - name: Vulnerability check
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        run: go tool govulncheck ./...
 
   build:
     name: Build ${{ matrix.target }}
