@@ -41,6 +41,7 @@ func newSearchPage() *searchPage {
 
 func (p *searchPage) title() string { return "Search" }
 func (p *searchPage) typing() bool  { return p.inputFocused }
+func (p *searchPage) stopTyping()   { p.blurInput() }
 
 func (p *searchPage) selection() *row {
 	if p.results == nil || p.loading {

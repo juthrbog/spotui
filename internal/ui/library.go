@@ -14,7 +14,8 @@ import (
 
 // libraryPage lists Liked Songs, the user's playlists, and saved albums.
 type libraryPage struct {
-	list list
+	list   list
+	filter filterBar
 
 	playlists        []daemon.ApiLibraryPlaylist
 	playlistsErr     error
@@ -26,12 +27,17 @@ type libraryPage struct {
 }
 
 func newLibraryPage() *libraryPage {
-	return &libraryPage{list: list{columns: []column{{weight: 3}, {weight: 2}, {width: 11, right: true}}}}
+	return &libraryPage{
+		list:   list{columns: []column{{weight: 3}, {weight: 2}, {width: 11, right: true}}},
+		filter: newFilterBar(),
+	}
 }
 
-func (p *libraryPage) title() string   { return "Library" }
-func (p *libraryPage) typing() bool    { return false }
-func (p *libraryPage) selection() *row { return p.list.selected() }
+func (p *libraryPage) title() string     { return "Library" }
+func (p *libraryPage) typing() bool      { return p.filter.typing }
+func (p *libraryPage) stopTyping()       { p.filter.stop() }
+func (p *libraryPage) clearFilter() bool { return p.filter.clear(&p.list) }
+func (p *libraryPage) selection() *row   { return p.list.selected() }
 
 // load fetches playlists and, when the Web API is set up, saved albums.
 func (p *libraryPage) load(m *Model) tea.Cmd {
@@ -66,13 +72,23 @@ func (p *libraryPage) update(m *Model, msg tea.Msg) tea.Cmd {
 			return m.startWebLogin()
 		}
 	case tea.KeyPressMsg:
+		if p.filter.typing {
+			return p.filter.update(&p.list, msg)
+		}
 		if p.list.handleKey(msg.String()) {
 			return nil
 		}
-		if msg.String() == "enter" {
+		switch msg.String() {
+		case "f":
+			return p.filter.start()
+		case "enter":
 			if r := p.list.selected(); r != nil {
 				return m.push(newTracksPage(r.uri, r.label))
 			}
+		}
+	default:
+		if p.filter.typing {
+			return p.filter.update(&p.list, msg)
 		}
 	}
 	return nil
@@ -105,6 +121,9 @@ func (p *libraryPage) rebuild(m *Model) {
 			name = strings.Join(pl.Folder, " / ") + " / " + name
 		}
 		owner, kind := "", "Playlist"
+		if len(pl.Folder) > 0 {
+			kind += " in " + strings.Join(pl.Folder, " / ")
+		}
 		if pl.OwnerUsername != "" && pl.OwnerUsername != username {
 			owner = "by " + pl.OwnerUsername
 			kind += " · " + owner
@@ -146,7 +165,10 @@ func (p *libraryPage) rebuild(m *Model) {
 }
 
 func (p *libraryPage) view(m *Model, width, height int) string {
-	return p.list.view(width, height, true, "")
+	if !p.filter.active() {
+		return p.list.view(width, height, true, "")
+	}
+	return p.filter.view(&p.list, width) + "\n" + p.list.view(width, height-1, true, "")
 }
 
 func note(text string) row { return row{kind: rowNote, cols: []string{text}} }

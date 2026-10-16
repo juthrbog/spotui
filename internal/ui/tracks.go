@@ -21,9 +21,10 @@ const (
 // go-librespot fills in the list in the background, so the page polls until
 // every track has its details.
 type tracksPage struct {
-	uri  string
-	name string
-	list list
+	uri    string
+	name   string
+	list   list
+	filter filterBar
 
 	resp       *daemon.ApiContextTracks
 	err        error
@@ -33,8 +34,9 @@ type tracksPage struct {
 
 func newTracksPage(uri, name string) *tracksPage {
 	return &tracksPage{
-		uri:  uri,
-		name: name,
+		uri:    uri,
+		name:   name,
+		filter: newFilterBar(),
 		list: list{columns: []column{
 			{width: 4, right: true},
 			{weight: 4},
@@ -46,7 +48,9 @@ func newTracksPage(uri, name string) *tracksPage {
 }
 
 func (p *tracksPage) init(m *Model) tea.Cmd { return fetchContextTracks(m.ctx, m.eng, p, 0) }
-func (p *tracksPage) typing() bool          { return false }
+func (p *tracksPage) typing() bool          { return p.filter.typing }
+func (p *tracksPage) stopTyping()           { p.filter.stop() }
+func (p *tracksPage) clearFilter() bool     { return p.filter.clear(&p.list) }
 func (p *tracksPage) selection() *row       { return p.list.selected() }
 
 func (p *tracksPage) title() string {
@@ -87,13 +91,23 @@ func (p *tracksPage) update(m *Model, msg tea.Msg) tea.Cmd {
 		}
 		return fetchContextTracks(m.ctx, m.eng, p, tracksPollInterval)
 	case tea.KeyPressMsg:
+		if p.filter.typing {
+			return p.filter.update(&p.list, msg)
+		}
 		if p.list.handleKey(msg.String()) {
 			return nil
 		}
-		if msg.String() == "enter" {
+		switch msg.String() {
+		case "f":
+			return p.filter.start()
+		case "enter":
 			if r := p.list.selected(); r != nil {
 				return m.play(p.uri, r.uri)
 			}
+		}
+	default:
+		if p.filter.typing {
+			return p.filter.update(&p.list, msg)
 		}
 	}
 	return nil
@@ -120,13 +134,18 @@ func (p *tracksPage) rebuild() {
 }
 
 func (p *tracksPage) view(m *Model, width, height int) string {
+	head := ""
+	if p.filter.active() {
+		head = p.filter.view(&p.list, width) + "\n"
+		height--
+	}
 	switch {
 	case p.err != nil:
-		return styleError.Render("Could not load tracks: " + p.err.Error())
+		return head + styleError.Render("Could not load tracks: "+p.err.Error())
 	case p.resp == nil || !p.resp.Ready:
-		return styleDim.Render("Loading tracks…")
+		return head + styleDim.Render("Loading tracks…")
 	case p.resp.Length == 0:
-		return styleDim.Render("No tracks.")
+		return head + styleDim.Render("No tracks.")
 	}
-	return p.list.view(width, height, true, m.playingURI())
+	return head + p.list.view(width, height, true, m.playingURI())
 }
