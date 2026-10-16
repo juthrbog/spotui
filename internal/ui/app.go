@@ -37,6 +37,7 @@ type page interface {
 	update(m *Model, msg tea.Msg) tea.Cmd
 	view(m *Model, width, height int) string
 	typing() bool    // true while a text input has focus
+	stopTyping()     // moves focus from the text input to the list
 	selection() *row // the selected row, or nil
 }
 
@@ -326,10 +327,10 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 
-	// Tab switches tabs even while typing, so the search box never traps the
+	// Tab switches tabs even while typing, so a text box never traps the
 	// keyboard.
 	if key == "tab" || key == "shift+tab" {
-		m.search.blurInput()
+		m.current().stopTyping()
 		m.tab = 1 - m.tab
 		return nil
 	}
@@ -387,6 +388,10 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 			return m.library.load(m)
 		}
 	case "esc", "backspace":
+		// Esc removes a filter before it goes back.
+		if f, ok := cur.(interface{ clearFilter() bool }); ok && key == "esc" && f.clearFilter() {
+			return nil
+		}
 		if !m.pop() {
 			return cur.update(m, msg)
 		}
@@ -554,9 +559,13 @@ func (m *Model) footerView(w int) string {
 		}
 		return style.Render(fit(" "+m.flash, w, false))
 	}
-	hint := " space play/pause · n/p next/prev · ←/→ seek · +/- volume · s shuffle · r repeat · / search · ? help · q quit"
-	if m.current().typing() {
-		hint = " typing in the search box · enter search · esc stop typing · tab switch tab · ctrl+c quit"
+	hint := " space play/pause · n/p next/prev · ←/→ seek · +/- volume · s shuffle · r repeat · f filter · / search · ? help · q quit"
+	if cur := m.current(); cur.typing() {
+		if _, ok := cur.(*searchPage); ok {
+			hint = " typing in the search box · enter search · esc stop typing · tab switch tab · ctrl+c quit"
+		} else {
+			hint = " typing a filter · enter keep filter · esc clear filter · ↑/↓ move · tab switch tab · ctrl+c quit"
+		}
 	}
 	return styleDim.Render(fit(hint, w, false))
 }
@@ -603,10 +612,11 @@ func helpView() string {
 		{"g / G", "first / last item"},
 		{"pgup / pgdown", "page up / down"},
 		{"enter", "open or play"},
-		{"esc", "go back, or stop typing"},
+		{"esc", "go back, stop typing, or clear the filter"},
 		{"", ""},
 		{"1 / 2 / tab", "library / search"},
-		{"/", "new search"},
+		{"f", "filter the list on screen"},
+		{"/", "search all of Spotify"},
 		{"R", "reload library"},
 		{"L", "log in to the Web API"},
 		{"q", "quit"},

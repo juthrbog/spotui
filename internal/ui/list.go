@@ -38,19 +38,131 @@ type row struct {
 
 func (r row) selectable() bool { return r.kind == rowItem }
 
-// list is a scrolling, selectable list of rows.
+// list is a scrolling, selectable list of rows. A filter can hide the rows
+// that do not match it.
 type list struct {
 	columns []column
-	rows    []row
+	all     []row // every row
+	rows    []row // the rows that match the filter
+	filter  string
 	cursor  int
 	offset  int
 	height  int // height of the last render, used for page up and down
 }
 
+// setRows replaces the rows. The cursor stays on the same item when it is
+// still there.
 func (l *list) setRows(rows []row) {
-	l.rows = rows
-	l.cursor = min(l.cursor, max(len(rows)-1, 0))
+	l.all = rows
+	l.apply(false)
+}
+
+// setFilter shows only the rows that contain every word of query.
+func (l *list) setFilter(query string) {
+	if query == l.filter {
+		return
+	}
+	l.filter = query
+	l.apply(true)
+}
+
+// apply filters the rows again. If the selected item is gone, the cursor
+// goes to the first item when toTop is set, or stays at the same position.
+func (l *list) apply(toTop bool) {
+	keep, old := "", l.cursor
+	if sel := l.selected(); sel != nil {
+		keep = sel.uri
+	}
+	l.rows = filterRows(l.all, l.filter)
+
+	switch {
+	case keep != "" && old < len(l.rows) && l.rows[old].uri == keep:
+		l.cursor = old
+	case keep != "" && indexOfURI(l.rows, keep) >= 0:
+		l.cursor = indexOfURI(l.rows, keep)
+	case toTop:
+		l.cursor, l.offset = 0, 0
+	default:
+		l.cursor = min(old, max(len(l.rows)-1, 0))
+	}
 	l.move(0)
+}
+
+func indexOfURI(rows []row, uri string) int {
+	for i, r := range rows {
+		if r.selectable() && r.uri == uri {
+			return i
+		}
+	}
+	return -1
+}
+
+// filterRows returns the items that contain every word of query, ignoring
+// case. A section title stays only when an item under it matches. Notes are
+// dropped.
+func filterRows(rows []row, query string) []row {
+	words := strings.Fields(strings.ToLower(query))
+	if len(words) == 0 {
+		return rows
+	}
+	var out []row
+	var title *row // section title not shown yet
+	for i := range rows {
+		r := rows[i]
+		switch {
+		case r.kind == rowHeader:
+			if len(r.cols) > 0 && r.cols[0] != "" {
+				title = &rows[i]
+			}
+			continue
+		case r.kind == rowNote || !matches(r, words):
+			continue
+		}
+		if title != nil {
+			if len(out) > 0 {
+				out = append(out, row{kind: rowHeader})
+			}
+			out = append(out, *title)
+			title = nil
+		}
+		out = append(out, r)
+	}
+	if len(out) == 0 {
+		out = append(out, note("No matches."))
+	}
+	return out
+}
+
+// matches reports whether the text of r contains every word. The panel
+// lines are used when a row has them, because the columns also hold track
+// numbers and durations.
+func matches(r row, words []string) bool {
+	text := strings.Join(r.info, " ")
+	if text == "" {
+		text = strings.Join(r.cols, " ")
+	}
+	text = strings.ToLower(text)
+	for _, w := range words {
+		if !strings.Contains(text, w) {
+			return false
+		}
+	}
+	return true
+}
+
+// counts returns the number of items on screen and in total.
+func (l *list) counts() (shown, total int) {
+	for _, r := range l.rows {
+		if r.selectable() {
+			shown++
+		}
+	}
+	for _, r := range l.all {
+		if r.selectable() {
+			total++
+		}
+	}
+	return shown, total
 }
 
 func (l *list) selected() *row {
