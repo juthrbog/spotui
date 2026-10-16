@@ -1,0 +1,67 @@
+version: "3"
+
+vars:
+  BINARY: spotui
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # ─── Build ──────────────────────────────────────────────
+
+  build:
+    desc: Build the binary
+    cmds:
+      - go build -o {{.BINARY}} .
+    sources:
+      - ./**/*.go
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.BINARY}}"
+
+  run:
+    desc: Build and run spotui
+    deps: [build]
+    cmds:
+      - ./{{.BINARY}} {{.CLI_ARGS}}
+
+  # ─── Testing ────────────────────────────────────────────
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./... -v
+
+  # ─── Linting ────────────────────────────────────────────
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run ./...
+
+  vuln:
+    desc: Check for known vulnerabilities
+    cmds:
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  fmt:
+    desc: Format code
+    cmds:
+      - gofmt -s -w .
+
+  # ─── Housekeeping ───────────────────────────────────────
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -f {{.BINARY}}
+      - rm -rf .task/ dist/
+
+  deps:
+    desc: Download and tidy dependencies
+    cmds:
+      - go mod download
+      - go mod tidy

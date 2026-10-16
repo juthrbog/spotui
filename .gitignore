@@ -1,0 +1,22 @@
+# Binaries
+/spotui
+*.exe
+*.test
+
+# Code coverage
+*.out
+coverage.*
+*.coverprofile
+
+# Go workspace file
+go.work
+go.work.sum
+
+# env file
+.env
+
+# Task runner
+.task/
+
+# GoReleaser
+dist/
