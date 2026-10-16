@@ -8,11 +8,34 @@ spotui also shows up as a Spotify Connect device. You can control it from the Sp
 
 ## Requirements
 
-You need these items to build and use spotui:
+You need these items to use spotui:
 
 - A Spotify Premium account. Spotify does not allow playback in third-party players without Premium.
-- Linux with PulseAudio or PipeWire. ALSA also works.
-- Go 1.25 or later.
+- Linux on x86-64 or ARM64, with PulseAudio or PipeWire. ALSA also works.
+
+## Install
+
+### Download a release
+
+Each [release](https://github.com/juthrbog/spotui/releases) has a binary for Linux on x86-64 (`amd64`) and on ARM64 (`arm64`). The binary needs glibc 2.28 or later and the ALSA library (`alsa-lib` on Arch Linux, `libasound2` on Debian and Ubuntu). Most desktop distributions have both.
+
+These commands download version 0.1.0 for x86-64 and install it in `~/.local/bin`. Change `version` and `arch` as necessary:
+
+```sh
+version=0.1.0 arch=amd64
+curl -LO "https://github.com/juthrbog/spotui/releases/download/v${version}/spotui_${version}_linux_${arch}.tar.gz"
+gh attestation verify "spotui_${version}_linux_${arch}.tar.gz" --repo juthrbog/spotui
+tar -xzf "spotui_${version}_linux_${arch}.tar.gz" spotui
+install -D -m 755 spotui ~/.local/bin/spotui
+```
+
+The `gh attestation verify` command is optional. It makes sure that the GitHub release workflow of this repository built the file. Each release also has a `checksums.txt` file.
+
+### Build from source
+
+To build spotui, you need these items:
+
+- Go 1.27.2 or later.
 - A C compiler, `pkg-config`, and the libraries for ALSA, Ogg, Vorbis, FLAC, and mpg123.
 
 On Arch Linux, this command installs the libraries:
@@ -21,21 +44,21 @@ On Arch Linux, this command installs the libraries:
 sudo pacman -S --needed base-devel pkgconf alsa-lib libogg libvorbis flac mpg123
 ```
 
-## Install
-
-To install the latest version, run this command. You must first install the requirements in the previous section.
+To install the latest version from source, run this command:
 
 ```sh
 go install github.com/juthrbog/spotui@latest
 ```
 
-To build from the source code, run these commands:
+To build from a copy of the repository, run these commands:
 
 ```sh
 git clone https://github.com/juthrbog/spotui.git
 cd spotui
 go build -o spotui .
 ```
+
+To show the version of spotui, run `spotui -version`.
 
 ## First start
 
@@ -164,6 +187,18 @@ Run one copy of spotui at a time. Two copies use the same device ID, and Spotify
 spotui runs the go-librespot player inside its own process. The player plays the audio and keeps the queue. The terminal interface sends commands to the player over Go channels.
 
 Liked Songs, playlists, and track lists come from the internal Spotify API through go-librespot. Search and saved albums come from the public Web API through your developer app. Spotify limits the Web API by app, so a personal app gives you your own limit.
+
+## Development
+
+The `Taskfile.yml` file has the common tasks, for example `task test` and `task lint`. Run `task --list` to see all tasks.
+
+To make a release, do these steps:
+
+1. Merge the changes into the `main` branch.
+2. On the `main` branch, run `task release -- v0.1.0` with the new version. The task makes the tag and pushes it.
+3. The Release workflow tests the code and builds the binaries for `amd64` and `arm64`. It runs each binary on a computer of the same type. Then it publishes the release with the archives, `checksums.txt`, and build attestations.
+
+The release binaries are built in a Debian 10 container. The container links the audio libraries statically, so the binaries run on most distributions. To build a release binary on your computer, run `task release:build -- amd64`. The build needs Docker and writes the binary to `dist/linux_amd64/spotui`.
 
 ## License
 

@@ -18,5 +18,6 @@ go.work.sum
 # Task runner
 .task/
 
-# GoReleaser
+# Release builds (build/build.sh)
 dist/
+.gocache/

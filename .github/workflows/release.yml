@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Build and check the binaries, without a release, when the build changes.
+  pull_request:
+    paths:
+      - "build/**"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned to a commit SHA, with the version in a comment.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # Test and scan with the latest patch of this minor version, so
+          # standard library fixes apply.
+          go-version: "1.27.x"
+          check-latest: true
+
+      # go-librespot decodes and plays audio through these C libraries.
+      - name: Install audio libraries
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev libogg-dev libvorbis-dev libflac-dev libmpg123-dev
+
+      # A tag publishes binaries, so the code must pass the same checks as CI
+      # and the vulnerability scan first.
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -shuffle=on ./...
+
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  build:
+    name: Build linux/${{ matrix.arch }}
+    needs: test
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set the version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=snapshot" >> "$GITHUB_ENV"
+          fi
+
+      # build.sh compiles the binary in a Debian 10 container with static
+      # audio libraries. See build/Dockerfile.
+      - name: Build
+        run: build/build.sh "${{ matrix.arch }}"
+
+      - name: Package
+        run: |
+          mkdir -p release
+          tar -czf "release/spotui_${VERSION}_linux_${{ matrix.arch }}.tar.gz" \
+            -C "$PWD/dist/linux_${{ matrix.arch }}" spotui \
+            -C "$PWD" README.md LICENSE
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: spotui-linux-${{ matrix.arch }}
+          path: release/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  verify:
+    name: Run on linux/${{ matrix.arch }}
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: spotui-linux-${{ matrix.arch }}
+
+      # The binary needs only glibc 2.28 or later and libasound.so.2.
+      - name: Run spotui -version
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2t64
+          tar -xzf spotui_*_linux_${{ matrix.arch }}.tar.gz
+          ldd ./spotui
+          glibc="$(objdump -T ./spotui | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
+          echo "Newest glibc symbol: $glibc"
+          printf '%s\n' "$glibc" GLIBC_2.28 | sort -C -V || { echo "The binary needs a glibc newer than 2.28"; exit 1; }
+          ./spotui -version
+
+  publish:
+    name: Publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # sign the provenance attestation
+      attestations: write # store the provenance attestation
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: spotui-linux-*
+          path: release
+          merge-multiple: true
+
+      - name: Write checksums
+        working-directory: release
+        run: sha256sum *.tar.gz > checksums.txt
+
+      # Users can check where an archive came from with
+      # "gh attestation verify <archive> --repo juthrbog/spotui".
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: release/checksums.txt
+
+      # The release notes list the pull requests since the last release.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag

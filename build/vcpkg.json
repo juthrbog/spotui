@@ -1,0 +1,8 @@
+{
+  "dependencies": [
+    "alsa",
+    "libvorbis",
+    "libflac",
+    "mpg123"
+  ]
+}
