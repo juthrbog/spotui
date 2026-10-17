@@ -32,7 +32,7 @@ type Config struct {
 	InitialVolume int    `toml:"initial_volume"`
 
 	// CoverArt selects how cover images are drawn: "auto", "kitty",
-	// "blocks", or "off".
+	// "sixel", "blocks", or "off".
 	CoverArt string `toml:"cover_art"`
 }
 
@@ -124,9 +124,9 @@ func Load(path string) (Config, error) {
 		return cfg, fmt.Errorf("audio_backend must be one of %q on this system, not %q", backends, cfg.AudioBackend)
 	}
 	switch cfg.CoverArt {
-	case "auto", "kitty", "blocks", "off":
+	case "auto", "kitty", "sixel", "blocks", "off":
 	default:
-		return cfg, fmt.Errorf(`cover_art must be "auto", "kitty", "blocks", or "off", not %q`, cfg.CoverArt)
+		return cfg, fmt.Errorf(`cover_art must be "auto", "kitty", "sixel", "blocks", or "off", not %q`, cfg.CoverArt)
 	}
 	if cfg.RedirectPort <= 0 || cfg.RedirectPort > 65535 {
 		return cfg, fmt.Errorf("redirect_port must be between 1 and 65535, not %d", cfg.RedirectPort)
@@ -171,8 +171,10 @@ bitrate = 320
 initial_volume = 50
 
 # How cover art is drawn:
-#   "auto"   - sharp images if the terminal supports kitty graphics, else blocks
+#   "auto"   - kitty if the terminal supports it, then sixel on Windows if the
+#              terminal supports it, else blocks
 #   "kitty"  - sharp images (kitty, Ghostty)
+#   "sixel"  - sharp images (Windows Terminal)
 #   "blocks" - colored half-block characters, works in any true-color terminal
 #   "off"    - no cover art
 cover_art = "auto"
