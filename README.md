@@ -56,7 +56,7 @@ On Windows, extract `spotui.exe` from the zip file and run it in Windows Termina
 To build spotui, you need these items:
 
 - Go 1.27.2 or later.
-- A C compiler, `pkg-config`, and the libraries for ALSA, Ogg, Vorbis, FLAC, and mpg123.
+- A C compiler, `pkg-config`, and the libraries for Ogg, Vorbis, FLAC, and mpg123. Linux also needs the ALSA library.
 
 On Arch Linux, this command installs the libraries:
 
@@ -70,7 +70,26 @@ On macOS, this command installs them:
 brew install pkgconf libogg libvorbis flac mpg123
 ```
 
-On Windows, use the release binary.
+On Windows, [MSYS2](https://www.msys2.org/) supplies the C compiler, `pkg-config`, and the libraries. Do these steps:
+
+1. Install MSYS2 in `C:\msys64`.
+2. Open the MSYS2 UCRT64 shell and run this command:
+
+   ```sh
+   pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-libogg mingw-w64-ucrt-x86_64-libvorbis mingw-w64-ucrt-x86_64-flac mingw-w64-ucrt-x86_64-mpg123
+   ```
+
+3. Add `C:\msys64\ucrt64\bin` to the `PATH` environment variable of Windows. Go then finds `gcc` and `pkg-config` in PowerShell too.
+4. Open a new PowerShell window, so that it uses the new `PATH`.
+5. In this PowerShell window, set these environment variables. Then run the `go install` or `go build` command below in the same window.
+
+   ```powershell
+   $env:CGO_CFLAGS = "-O2 -g -DFLAC__NO_DLL"
+   $env:CGO_LDFLAGS = "-static"
+   $env:GOFLAGS = "-ldflags=-extldflags=-Wl,-logg,-lshlwapi"
+   ```
+
+These variables link the libraries statically into `spotui.exe`. The binary then needs no DLL files from MSYS2, so it also runs on other computers. A dynamic link fails, because the libogg DLL of MSYS2 does not export `ogg_stream_iovecin`. `-DFLAC__NO_DLL` tells the FLAC headers that FLAC is a static library. The `GOFLAGS` value adds libogg again at the end of the link, after libvorbis, and adds `shlwapi` for libmpg123.
 
 To install the latest version from source, run this command:
 
