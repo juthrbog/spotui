@@ -1,10 +1,13 @@
 // Package art downloads cover images and turns them into terminal text. It
-// supports two ways to draw an image:
+// supports three ways to draw an image:
 //
 //   - Kitty graphics with Unicode placeholders. The image is sent to the
 //     terminal once, and the screen shows it through special placeholder
 //     characters. This gives a sharp image in kitty, Ghostty, and terminals
 //     that copy their protocol.
+//   - Sixel. The image is drawn in pixels at the cursor, outside the text
+//     of the screen. This gives a sharp image in Windows Terminal, which
+//     does not support kitty graphics.
 //   - Half blocks. Each cell shows two pixels with the "▀" character, colored
 //     with the top pixel in front and the bottom pixel behind. This works in
 //     any terminal with true color.
@@ -21,11 +24,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
+	"github.com/charmbracelet/x/ansi/sixel"
 	"golang.org/x/image/draw"
 )
 
@@ -36,6 +41,7 @@ const (
 	ModeOff Mode = iota
 	ModeBlocks
 	ModeKitty
+	ModeSixel
 )
 
 func (m Mode) String() string {
@@ -44,6 +50,8 @@ func (m Mode) String() string {
 		return "blocks"
 	case ModeKitty:
 		return "kitty"
+	case ModeSixel:
+		return "sixel"
 	default:
 		return "off"
 	}
@@ -55,6 +63,9 @@ const (
 	// maxKittyPixels caps the size of an image sent to the terminal. The
 	// terminal scales it to the cell box.
 	maxKittyPixels = 400
+	// maxSixelPixels caps the size of a sixel box. The terminal does not
+	// scale sixel images, so the image has the pixel size of the box.
+	maxSixelPixels = 2048
 )
 
 // Fetch downloads and decodes the image at url.
@@ -212,6 +223,63 @@ const QueryID = 31
 // the payload "OK". Other terminals ignore it.
 func KittyQuery() string {
 	return ansi.KittyGraphics([]byte("AAAA"), "i="+strconv.Itoa(QueryID), "s=1", "v=1", "a=q", "t=d", "f=24")
+}
+
+// SixelImage is an image encoded as sixel for a box of cells.
+type SixelImage struct {
+	Seq    string      // draws the image at the cursor
+	Offset image.Point // cell in the box where the image starts
+	Size   image.Point // size of the image in pixels
+}
+
+// Sixel encodes img for a cols×rows cell box with cells of cellW×cellH
+// pixels. The image keeps its aspect ratio and is centered in the box to
+// the nearest cell.
+func Sixel(img image.Image, cols, rows, cellW, cellH int) (SixelImage, error) {
+	if cols <= 0 || rows <= 0 || cellW <= 0 || cellH <= 0 {
+		return SixelImage{}, errors.New("empty sixel box")
+	}
+	w, h := cols*cellW, rows*cellH
+	if w > maxSixelPixels || h > maxSixelPixels {
+		return SixelImage{}, fmt.Errorf("sixel box of %dx%d pixels is too large", w, h)
+	}
+	r := fitRect(img.Bounds(), w, h)
+	dst := image.NewRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
+	draw.CatmullRom.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Src, nil)
+
+	var buf bytes.Buffer
+	if err := new(sixel.Encoder).Encode(&buf, dst); err != nil {
+		return SixelImage{}, fmt.Errorf("encoding cover art: %w", err)
+	}
+	return SixelImage{
+		// P2 = 1 leaves pixels without a color unchanged.
+		Seq:    ansi.SixelGraphics(0, 1, 0, buf.Bytes()),
+		Offset: image.Pt(r.Min.X/cellW, r.Min.Y/cellH),
+		Size:   r.Size(),
+	}, nil
+}
+
+// DrawAt returns the sequence that draws the image in the box with its
+// top-left cell at column x and row y of the screen, counted from 0. It
+// puts the cursor back where it was, so the screen renderer can go on
+// from there.
+func (s SixelImage) DrawAt(x, y int) string {
+	return ansi.SaveCursor +
+		ansi.CursorPosition(x+s.Offset.X+1, y+s.Offset.Y+1) +
+		s.Seq +
+		ansi.RestoreCursor
+}
+
+// CellSizeQuery returns a sequence that asks the terminal for the size of
+// a cell in pixels.
+func CellSizeQuery() string {
+	return ansi.WindowOp(16)
+}
+
+// SixelSupported reports whether a primary device attributes (DA1) answer
+// lists sixel graphics.
+func SixelSupported(da1 []int) bool {
+	return slices.Contains(da1, 4)
 }
 
 // PlaceholdersUnsupported reports whether the environment shows a terminal

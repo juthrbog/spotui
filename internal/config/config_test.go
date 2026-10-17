@@ -50,7 +50,7 @@ func TestEnvOverridesClientID(t *testing.T) {
 }
 
 func TestInvalidValues(t *testing.T) {
-	for _, body := range []string{`bitrate = 128`, `initial_volume = 101`, `redirect_port = 0`, `cover_art = "sixel"`, `audio_backend = "jack"`} {
+	for _, body := range []string{`bitrate = 128`, `initial_volume = 101`, `redirect_port = 0`, `cover_art = "ascii"`, `audio_backend = "jack"`} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatal(err)

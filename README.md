@@ -170,14 +170,23 @@ To search, push `/`, type the search, and push `enter`. While you type, the keys
 
 If the terminal is 90 columns or wider, spotui shows a panel on the right. The panel shows the cover of the selected playlist, album, artist, or song. If nothing is selected, the panel shows the cover of the song that plays.
 
-spotui draws covers in one of two ways:
+spotui draws covers in one of three ways:
 
 - Kitty graphics show sharp images. kitty and Ghostty support them. In this mode, spotui also shows a small cover next to the song that plays.
+- Sixel graphics show sharp images. Windows Terminal 1.22 and later support them. In this mode, spotui shows only the cover in the panel.
 - Half blocks draw each cover with colored `▀` characters. They work in all terminals with true color, but the image is not sharp.
 
-With the default `cover_art = "auto"`, spotui asks the terminal at start if it supports kitty graphics. If the terminal does not answer, spotui uses half blocks.
+With the default `cover_art = "auto"`, spotui asks the terminal at start which graphics it supports. If the terminal supports kitty graphics, spotui uses them. On Windows, spotui then uses sixel graphics if the terminal supports them. In all other cases, spotui uses half blocks.
 
-If a cover shows as an empty box or as strange characters, set `cover_art = "blocks"` in the configuration file. This can happen when spotui runs inside a program that manages the terminal, such as herdr. In herdr, you can also turn on `kitty_graphics` in the herdr configuration.
+spotui was tested with sixel graphics only in Windows Terminal. On Linux and macOS, `auto` does not select sixel graphics. To use them in a terminal that supports them, such as foot or WezTerm, set `cover_art = "sixel"`.
+
+### Terminal multiplexers
+
+A terminal multiplexer is a program that shows several terminal sessions in one window, such as herdr or tmux. When spotui runs in a terminal multiplexer, covers can be less sharp. When spotui asks which graphics the terminal supports, the multiplexer answers, not the terminal. If the multiplexer does not pass graphics through to the terminal, spotui uses half blocks.
+
+For example, herdr does not pass sixel graphics through to Windows Terminal. For sharp covers in Windows Terminal, run spotui directly in a tab of Windows Terminal, not in herdr. herdr has an experimental `kitty_graphics` option, but it works only when the terminal that runs herdr supports kitty graphics.
+
+If a cover shows as an empty box or as strange characters, set `cover_art = "blocks"` in the configuration file.
 
 ## Configuration
 
@@ -192,7 +201,7 @@ spotui writes the configuration file `config.toml` with comments on its first st
 | `audio_device` | empty | Output device. Empty means the system default. |
 | `bitrate` | `320` | Stream quality in kbit/s: `96`, `160`, or `320` |
 | `initial_volume` | `50` | Volume on the first start, from 0 to 100 |
-| `cover_art` | `auto` | `auto`, `kitty`, `blocks`, or `off` |
+| `cover_art` | `auto` | `auto`, `kitty`, `sixel`, `blocks`, or `off` |
 
 If you change `redirect_port`, change the redirect URI of your developer app to the same port.
 

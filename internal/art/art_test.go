@@ -86,6 +86,62 @@ func TestKittyTransmitUsesVirtualPlacement(t *testing.T) {
 	}
 }
 
+func TestSixelFillsTheBox(t *testing.T) {
+	s, err := Sixel(solid(640, 640, color.RGBA{R: 200, G: 10, B: 30, A: 255}), 4, 2, 10, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Size != image.Pt(40, 40) || s.Offset != (image.Point{}) {
+		t.Errorf("size %v offset %v, want 40x40 at the box corner", s.Size, s.Offset)
+	}
+	if want := "\x1bP0;1q\"1;1;40;40"; !strings.HasPrefix(s.Seq, want) {
+		t.Errorf("sequence starts with %q, want %q", s.Seq[:min(len(s.Seq), 20)], want)
+	}
+	if !strings.HasSuffix(s.Seq, "\x1b\\") {
+		t.Error("sequence is not terminated")
+	}
+	// 200, 10, 30 in the 0-100 range of sixel colors.
+	if !strings.Contains(s.Seq, ";2;78;4;12") {
+		t.Error("sequence does not use the image color")
+	}
+}
+
+func TestSixelCentersToTheCell(t *testing.T) {
+	// A wide image in a tall box: 40x10 pixels, 35 pixels from the top.
+	s, err := Sixel(solid(400, 100, color.White), 4, 4, 10, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Size != image.Pt(40, 10) || s.Offset != image.Pt(0, 1) {
+		t.Errorf("size %v offset %v, want 40x10 at row 1", s.Size, s.Offset)
+	}
+	draw := s.DrawAt(50, 3)
+	if want := "\x1b7\x1b[5;51H\x1bP"; !strings.HasPrefix(draw, want) {
+		t.Errorf("draw starts with %q, want %q", draw[:min(len(draw), 20)], want)
+	}
+	if !strings.HasSuffix(draw, "\x1b8") {
+		t.Error("draw does not restore the cursor")
+	}
+}
+
+func TestSixelRejectsHugeBox(t *testing.T) {
+	if _, err := Sixel(solid(10, 10, color.White), 400, 10, 10, 20); err == nil {
+		t.Error("4000 pixel box: no error")
+	}
+	if _, err := Sixel(solid(10, 10, color.White), 4, 2, 0, 0); err == nil {
+		t.Error("unknown cell size: no error")
+	}
+}
+
+func TestSixelSupported(t *testing.T) {
+	if !SixelSupported([]int{61, 4, 6, 7, 14, 21, 22}) {
+		t.Error("Windows Terminal answer: no sixel")
+	}
+	if SixelSupported([]int{62, 22}) {
+		t.Error("answer without 4: sixel")
+	}
+}
+
 func TestFetchRejectsBadInput(t *testing.T) {
 	var pngData bytes.Buffer
 	if err := png.Encode(&pngData, solid(4, 4, color.White)); err != nil {

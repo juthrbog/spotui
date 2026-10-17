@@ -178,14 +178,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) update(msg tea.Msg) tea.Cmd {
-	if m.art.update(msg) {
-		return nil
+	if ok, cmd := m.art.update(msg); ok {
+		return cmd
 	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		return nil
+		return m.art.resize()
 
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
@@ -402,7 +402,10 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 // Layout: header, rule, breadcrumb, body, rule, three now-playing lines, footer.
-const chromeHeight = 8
+const (
+	chromeHeight = 8
+	bodyTop      = 3 // first row of the body
+)
 
 func (m *Model) View() tea.View {
 	v := tea.NewView(m.render())
