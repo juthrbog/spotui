@@ -381,6 +381,10 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.tab = tabSearch
 		m.stacks[tabSearch] = m.stacks[tabSearch][:1]
 		return m.search.focusInput()
+	case "A":
+		return m.goToAlbum()
+	case "I":
+		return m.goToArtist()
 	case "L":
 		return m.startWebLogin()
 	case "R":
@@ -615,6 +619,7 @@ func helpView() string {
 		{"g / G", "first / last item"},
 		{"pgup / pgdown", "page up / down"},
 		{"enter", "open or play"},
+		{"A / I", "go to the album / artist of the track"},
 		{"esc", "go back, stop typing, or clear the filter"},
 		{"", ""},
 		{"1 / 2 / tab", "library / search"},

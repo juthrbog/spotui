@@ -123,12 +123,12 @@ func (p *tracksPage) rebuild() {
 		}
 		t := it.Track
 		artists := strings.Join(t.ArtistNames, ", ")
-		rows[i] = row{
-			cols:  []string{num, t.Name, artists, t.AlbumName, formatMs(int64(t.Duration))},
-			uri:   it.Uri,
-			image: deref(t.AlbumCoverUrl),
-			info:  []string{t.Name, artists, t.AlbumName},
-		}
+		r := trackRow(t)
+		r.cols = []string{num, t.Name, artists, t.AlbumName, formatMs(int64(t.Duration))}
+		r.uri = it.Uri
+		r.image = deref(t.AlbumCoverUrl)
+		r.info = []string{t.Name, artists, t.AlbumName}
+		rows[i] = r
 	}
 	p.list.setRows(rows)
 }
