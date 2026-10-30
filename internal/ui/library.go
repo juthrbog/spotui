@@ -152,14 +152,7 @@ func (p *libraryPage) rebuild(m *Model) {
 		rows = append(rows, note("No saved albums."))
 	}
 	for _, a := range p.albums {
-		artists := webapi.ArtistNames(a.Artists)
-		rows = append(rows, row{
-			cols:  []string{a.Name, artists, a.Year()},
-			uri:   a.URI,
-			label: a.Name,
-			image: webapi.PickImage(a.Images),
-			info:  []string{a.Name, artists, albumKind(a)},
-		})
+		rows = append(rows, albumRow(a))
 	}
 	p.list.setRows(rows)
 }
@@ -172,6 +165,21 @@ func (p *libraryPage) view(m *Model, width, height int) string {
 }
 
 func note(text string) row { return row{kind: rowNote, cols: []string{text}} }
+
+// albumRow returns the list row of a Web API album. The album links to
+// itself, so go to album opens it.
+func albumRow(a webapi.Album) row {
+	artists := webapi.ArtistNames(a.Artists)
+	return row{
+		cols:    []string{a.Name, artists, a.Year()},
+		uri:     a.URI,
+		label:   a.Name,
+		image:   webapi.PickImage(a.Images),
+		info:    []string{a.Name, artists, albumKind(a)},
+		album:   ref{uri: a.URI, name: a.Name},
+		artists: artistRefs(a.Artists),
+	}
+}
 
 func albumKind(a webapi.Album) string {
 	if y := a.Year(); y != "" {

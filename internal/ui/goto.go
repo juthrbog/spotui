@@ -44,6 +44,7 @@ func artistRefs(artists []webapi.Artist) []ref {
 }
 
 func isTrackURI(uri string) bool { return strings.HasPrefix(uri, "spotify:track:") }
+func isAlbumURI(uri string) bool { return strings.HasPrefix(uri, "spotify:album:") }
 
 // trackRow returns a row with the links of t.
 func trackRow(t *daemon.ApiTrack) row {
@@ -55,14 +56,14 @@ func trackRow(t *daemon.ApiTrack) row {
 	}
 }
 
-// actionTrack returns the track that an action applies to: the selected
-// track, or the track that plays when no track is selected. In a track list
-// it is always the selected row, also for an episode or a local file, so an
-// action never applies to a track that the user did not pick. It returns nil
-// when there is no such track.
-func (m *Model) actionTrack() *row {
+// actionItem returns the item that an action applies to: the selected track
+// or album, or the track that plays when no track or album is selected. In
+// a track list it is always the selected row, also for an episode or a
+// local file, so an action never applies to a track that the user did not
+// pick. It returns nil when there is no such item.
+func (m *Model) actionItem() *row {
 	sel := m.current().selection()
-	if _, ok := m.current().(*tracksPage); ok || (sel != nil && isTrackURI(sel.uri)) {
+	if _, ok := m.current().(*tracksPage); ok || (sel != nil && (isTrackURI(sel.uri) || isAlbumURI(sel.uri))) {
 		return sel
 	}
 	if m.status == nil || m.status.Track == nil {
@@ -72,8 +73,10 @@ func (m *Model) actionTrack() *row {
 	return &r
 }
 
-func (m *Model) goToAlbum() tea.Cmd {
-	t := m.actionTrack()
+func (m *Model) goToAlbum() tea.Cmd  { return m.goToAlbumOf(m.actionItem()) }
+func (m *Model) goToArtist() tea.Cmd { return m.goToArtistOf(m.actionItem()) }
+
+func (m *Model) goToAlbumOf(t *row) tea.Cmd {
 	switch {
 	case t == nil:
 		return m.setFlash("Select a track or play one first.", true)
@@ -83,17 +86,20 @@ func (m *Model) goToAlbum() tea.Cmd {
 	return m.push(newTracksPage(t.album.uri, t.album.name))
 }
 
-func (m *Model) goToArtist() tea.Cmd {
-	t := m.actionTrack()
+func (m *Model) goToArtistOf(t *row) tea.Cmd {
 	switch {
 	case t == nil:
 		return m.setFlash("Select a track or play one first.", true)
 	case len(t.artists) == 0:
 		return m.setFlash("No artist is known for this item.", true)
-	case len(t.artists) == 1:
-		return m.openArtist(t.artists[0].uri, t.artists[0].name)
+	case len(t.artists) > 1:
+		return m.push(newArtistsPage(t.label, t.artists))
 	}
-	return m.push(newArtistsPage(t.label, t.artists))
+	a := t.artists[0]
+	if p, ok := m.current().(*artistPage); ok && p.uri == a.uri {
+		return m.setFlash("This is the page of "+a.name+".", false)
+	}
+	return m.openArtist(a.uri, a.name)
 }
 
 // goToContext opens the playlist, album, or artist that plays. If a page

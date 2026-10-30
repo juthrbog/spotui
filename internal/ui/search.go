@@ -176,14 +176,7 @@ func (p *searchPage) rebuild() {
 	if len(res.Albums.Items) > 0 {
 		section("Albums")
 		for _, a := range res.Albums.Items {
-			artists := webapi.ArtistNames(a.Artists)
-			rows = append(rows, row{
-				cols:  []string{a.Name, artists, a.Year()},
-				uri:   a.URI,
-				label: a.Name,
-				image: webapi.PickImage(a.Images),
-				info:  []string{a.Name, artists, albumKind(a)},
-			})
+			rows = append(rows, albumRow(a))
 		}
 	}
 	if len(res.Artists.Items) > 0 {
