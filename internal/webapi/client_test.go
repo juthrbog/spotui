@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -147,6 +149,61 @@ func TestSavedAlbumsFollowsPages(t *testing.T) {
 	}
 	if len(albums) != 3 || albums[2].Name != "Three" {
 		t.Errorf("albums = %+v", albums)
+	}
+}
+
+func TestArtistAlbumsFollowsPagesForOneGroup(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if r.URL.Path != "/artists/abc/albums" || q.Get("include_groups") != GroupSingle || q.Get("limit") != "10" {
+			t.Errorf("request = %s", r.URL)
+		}
+		if q.Get("offset") == "0" {
+			_, _ = w.Write([]byte(`{"items": [{"name": "One"}, {"name": "Two"}], "total": 3}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"items": [{"name": "Three"}], "total": 3}`))
+	})
+
+	albums, total, err := c.ArtistAlbums(context.Background(), "spotify:artist:abc", GroupSingle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(albums) != 3 || albums[2].Name != "Three" || total != 3 {
+		t.Errorf("albums = %+v, total = %d", albums, total)
+	}
+}
+
+func TestArtistAlbumsStopsAtCap(t *testing.T) {
+	// Short pages of 9 albums must not take the result over the cap.
+	var calls atomic.Int32
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		n, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if n > 10 {
+			t.Errorf("limit = %d, the API allows 10 at most", n)
+		}
+		items := strings.TrimSuffix(strings.Repeat(`{"name": "A"},`, min(n, 9)), ",")
+		_, _ = w.Write([]byte(`{"items": [` + items + `], "total": 1000}`))
+	})
+
+	albums, total, err := c.ArtistAlbums(context.Background(), "spotify:artist:abc", GroupAppearsOn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(albums) != maxArtistAlbums || total != 1000 || calls.Load() != 6 {
+		t.Errorf("got %d albums, total %d, %d calls", len(albums), total, calls.Load())
+	}
+}
+
+func TestArtistAlbumsRejectsOtherURIs(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected request %s", r.URL)
+	})
+	for _, uri := range []string{"spotify:album:abc", "spotify:artist:", "spotify:artist:a/b"} {
+		if _, _, err := c.ArtistAlbums(context.Background(), uri, GroupAlbum); err == nil {
+			t.Errorf("ArtistAlbums(%q) gave no error", uri)
+		}
 	}
 }
 

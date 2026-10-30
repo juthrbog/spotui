@@ -91,7 +91,7 @@ func (m *Model) goToArtist() tea.Cmd {
 	case len(t.artists) == 0:
 		return m.setFlash("No artist is known for this item.", true)
 	case len(t.artists) == 1:
-		return m.push(newTracksPage(t.artists[0].uri, t.artists[0].name))
+		return m.openArtist(t.artists[0].uri, t.artists[0].name)
 	}
 	return m.push(newArtistsPage(t.label, t.artists))
 }
@@ -108,7 +108,7 @@ func (m *Model) goToContext() tea.Cmd {
 	}
 	for t, s := range m.stacks {
 		for i, p := range s {
-			if tp, ok := p.(*tracksPage); ok && sameContext(tp.uri, uri) {
+			if u := contextOf(p); u != "" && sameContext(u, uri) {
 				m.current().stopTyping()
 				m.tab = tab(t)
 				m.stacks[t] = s[:i+1]
@@ -120,7 +120,21 @@ func (m *Model) goToContext() tea.Cmd {
 	if name == "" {
 		name = contextKind(uri)
 	}
+	if strings.HasPrefix(uri, "spotify:artist:") {
+		return m.openArtist(uri, name)
+	}
 	return m.push(newTracksPage(uri, name))
+}
+
+// contextOf returns the context URI that a page shows, or an empty string.
+func contextOf(p page) string {
+	switch p := p.(type) {
+	case *tracksPage:
+		return p.uri
+	case *artistPage:
+		return p.uri
+	}
+	return ""
 }
 
 // isLikedSongs reports whether uri is one of the two context URIs that
@@ -180,7 +194,7 @@ func (p *artistsPage) update(m *Model, msg tea.Msg) tea.Cmd {
 	}
 	if key.String() == "enter" {
 		if r := p.list.selected(); r != nil {
-			return m.push(newTracksPage(r.uri, r.label))
+			return m.openArtist(r.uri, r.label)
 		}
 	}
 	return nil

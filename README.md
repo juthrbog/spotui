@@ -119,7 +119,7 @@ After the login, the Library tab shows Liked Songs and your playlists. Select a 
 
 ## Set up search and saved albums
 
-Search and saved albums use the Spotify Web API. The Web API needs a client ID from your own Spotify developer app. A client ID is the public name of an app on the Spotify platform. Playback and playlists work without it.
+Search, saved albums, and the albums on artist pages use the Spotify Web API. The Web API needs a client ID from your own Spotify developer app. A client ID is the public name of an app on the Spotify platform. Playback and playlists work without it.
 
 1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and log in.
 2. Create an app. The name and description can be any text.
@@ -168,7 +168,9 @@ To filter a list, push `f` and type. The list shows only the items that contain 
 
 `A` and `I` apply to the selected track. If no track is selected, they apply to the song that plays. If the track has more than one artist, `I` shows a list of the artists. Select one and push `enter`.
 
-Push `o` to open the playlist, album, or artist that plays. The list marks the song that plays. If the list is already open, `o` goes back to it.
+An artist page has a row that plays the artist and a row that shows all tracks of the artist. Below them, it shows the albums, singles and EPs, compilations, and albums that the artist appears on. Select an album and push `enter` to see its tracks. The albums come from the Web API. Without the Web API, the artist page shows only the tracks of the artist.
+
+Push `o` to open the playlist, album, or artist that plays. A playlist or an album opens as a track list that marks the song that plays. An artist opens as an artist page. If the page is already open, `o` goes back to it.
 
 To search, push `/`, type the search, and push `enter`. While you type, the keys go into the search box. To stop typing, push `esc` or `tab`. In the results, push `esc` to type again.
 
@@ -249,6 +251,7 @@ Run one copy of spotui at a time. Two copies use the same device ID, and Spotify
 ## Limits
 
 - spotui loads 500 saved albums at most.
+- An artist page shows 50 items at most in each section. The Web API gives 10 albums at most in each call, so this keeps the number of calls low.
 - A track list shows 800 tracks at most.
 - Search does not find playlists that Spotify made, such as Discover Weekly. spotui shows them only if they are in your library.
 
@@ -256,7 +259,7 @@ Run one copy of spotui at a time. Two copies use the same device ID, and Spotify
 
 spotui runs the go-librespot player inside its own process. The player plays the audio and keeps the queue. The terminal interface sends commands to the player over Go channels.
 
-Liked Songs, playlists, and track lists come from the internal Spotify API through go-librespot. Search and saved albums come from the public Web API through your developer app. Spotify limits the Web API by app, so a personal app gives you your own limit.
+Liked Songs, playlists, and track lists come from the internal Spotify API through go-librespot. Search, saved albums, and the albums on artist pages come from the public Web API through your developer app. Spotify limits the Web API by app, so a personal app gives you your own limit.
 
 ## Development
 

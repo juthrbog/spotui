@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -154,6 +155,49 @@ func (c *Client) Search(ctx context.Context, query string) (*SearchResult, error
 		return nil, err
 	}
 	return &res, nil
+}
+
+// The album groups of an artist. The February 2026 API removed the
+// album_group field from albums, so ArtistAlbums loads one group per call.
+const (
+	GroupAlbum       = "album"
+	GroupSingle      = "single"
+	GroupCompilation = "compilation"
+	GroupAppearsOn   = "appears_on"
+)
+
+// maxArtistAlbums caps how many albums of one group are loaded. Since
+// February 2026, a page has 10 albums at most, so the cap keeps an artist
+// page at 20 calls.
+const (
+	maxArtistAlbums  = 50
+	artistAlbumsPage = 10
+)
+
+// ArtistAlbums returns the albums of one group of the artist with the URI
+// artistURI. total is the number of albums that Spotify has in the group,
+// which is more than len(albums) when the cap was reached.
+func (c *Client) ArtistAlbums(ctx context.Context, artistURI, group string) (albums []Album, total int, err error) {
+	id, ok := strings.CutPrefix(artistURI, "spotify:artist:")
+	if !ok || id == "" || strings.ContainsAny(id, "/?#") {
+		return nil, 0, fmt.Errorf("not an artist URI: %q", artistURI)
+	}
+	path := "/artists/" + url.PathEscape(id) + "/albums"
+	for offset := 0; offset < maxArtistAlbums; {
+		var page Page[Album]
+		limit := min(artistAlbumsPage, maxArtistAlbums-offset)
+		q := url.Values{"include_groups": {group}, "limit": {strconv.Itoa(limit)}, "offset": {strconv.Itoa(offset)}}
+		if err := c.get(ctx, path, q, &page); err != nil {
+			return nil, 0, err
+		}
+		albums = append(albums, page.Items...)
+		total = page.Total
+		if len(page.Items) == 0 || len(albums) >= total {
+			break
+		}
+		offset += len(page.Items)
+	}
+	return albums, max(total, len(albums)), nil
 }
 
 // maxSavedAlbums caps how many saved albums are loaded, to keep the number

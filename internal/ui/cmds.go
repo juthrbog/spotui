@@ -45,6 +45,13 @@ type (
 		err   error
 	}
 	webLoginDoneMsg struct{ err error }
+	artistAlbumsMsg struct {
+		page   *artistPage
+		group  string
+		albums []webapi.Album
+		total  int
+		err    error
+	}
 )
 
 func waitForEvent(eng *engine.Engine) tea.Cmd {
@@ -95,6 +102,15 @@ func fetchContextTracks(ctx context.Context, eng *engine.Engine, page *tracksPag
 		defer cancel()
 		resp, err := eng.ContextTracks(ctx, page.uri)
 		return contextTracksMsg{page: page, resp: resp, err: err}
+	}
+}
+
+func loadArtistAlbums(ctx context.Context, web *webapi.Client, page *artistPage, group string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		albums, total, err := web.ArtistAlbums(ctx, page.uri, group)
+		return artistAlbumsMsg{page: page, group: group, albums: albums, total: total, err: err}
 	}
 }
 
