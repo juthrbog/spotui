@@ -96,6 +96,59 @@ func (m *Model) goToArtist() tea.Cmd {
 	return m.push(newArtistsPage(t.label, t.artists))
 }
 
+// goToContext opens the playlist, album, or artist that plays. If a page
+// of it is already open, it goes back to that page.
+func (m *Model) goToContext() tea.Cmd {
+	uri := ""
+	if m.status != nil {
+		uri = deref(m.status.ContextUri)
+	}
+	if uri == "" {
+		return m.setFlash("Nothing plays.", true)
+	}
+	for t, s := range m.stacks {
+		for i, p := range s {
+			if tp, ok := p.(*tracksPage); ok && sameContext(tp.uri, uri) {
+				m.current().stopTyping()
+				m.tab = tab(t)
+				m.stacks[t] = s[:i+1]
+				return nil
+			}
+		}
+	}
+	name := deref(m.status.ContextName)
+	if name == "" {
+		name = contextKind(uri)
+	}
+	return m.push(newTracksPage(uri, name))
+}
+
+// isLikedSongs reports whether uri is one of the two context URIs that
+// go-librespot accepts for Liked Songs.
+func isLikedSongs(uri string) bool {
+	return uri == "spotify:collection:tracks" ||
+		strings.HasPrefix(uri, "spotify:user:") && strings.HasSuffix(uri, ":collection")
+}
+
+func sameContext(a, b string) bool {
+	return a == b || isLikedSongs(a) && isLikedSongs(b)
+}
+
+// contextKind names the type of a context, for a context without a name.
+func contextKind(uri string) string {
+	switch {
+	case isLikedSongs(uri):
+		return "Liked Songs"
+	case strings.HasPrefix(uri, "spotify:album:"):
+		return "Album"
+	case strings.HasPrefix(uri, "spotify:artist:"):
+		return "Artist"
+	case strings.HasPrefix(uri, "spotify:show:"):
+		return "Show"
+	}
+	return "Playlist"
+}
+
 // artistsPage asks which artist of a track to open.
 type artistsPage struct {
 	track string
