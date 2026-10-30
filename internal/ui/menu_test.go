@@ -34,7 +34,7 @@ func TestActionsForItemTypes(t *testing.T) {
 	}
 	liked := map[string]bool{trackOne.Uri: true}
 	for _, c := range cases {
-		if got := labels(actionsFor(&c.item, liked)); got != c.want {
+		if got := labels(actionsFor(&c.item, liked, ref{})); got != c.want {
 			t.Errorf("%s: actions = %q, want %q", c.name, got, c.want)
 		}
 	}

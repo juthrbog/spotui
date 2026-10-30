@@ -64,12 +64,12 @@ func (p *libraryPage) update(m *Model, msg tea.Msg) tea.Cmd {
 		p.playlistsLoading = false
 		p.playlists, p.playlistsErr = msg.items, msg.err
 		p.rebuild(m)
-	case playlistAddMsg:
-		// Count the new item, so the row does not wait for the next R.
-		if msg.err == nil {
+	case playlistChangedMsg:
+		// Count the change, so the row does not wait for the next R.
+		if d := msg.countChange(); d != 0 {
 			for i := range p.playlists {
 				if p.playlists[i].Uri == msg.playlistURI {
-					p.playlists[i].Length++
+					p.playlists[i].Length = max(p.playlists[i].Length+d, 0)
 				}
 			}
 			p.rebuild(m)

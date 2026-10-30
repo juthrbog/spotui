@@ -66,6 +66,27 @@ func TestLibraryWrappersCheckBeforeSending(t *testing.T) {
 			t.Errorf("PlaylistAddTracks %s = %v, want a check error", name, err)
 		}
 	}
+	pos := func(i int) *int { return &i }
+	removes := map[string]struct {
+		playlist, uri string
+		position      *int
+	}{
+		"negative position": {playlist, track, pos(-1)},
+		"album as playlist": {"spotify:album:4uLU6hMCjMI75M1A2tKUQC", track, nil},
+		"album as item":     {playlist, "spotify:album:4uLU6hMCjMI75M1A2tKUQC", nil},
+		"local file":        {playlist, "spotify:local:a:b:c:1", nil},
+	}
+	for name, in := range removes {
+		if err := e.PlaylistRemoveTrack(ctx, in.playlist, in.uri, in.position); err == nil || errors.Is(err, context.Canceled) {
+			t.Errorf("PlaylistRemoveTrack %s = %v, want a check error", name, err)
+		}
+	}
+	for _, p := range []*int{nil, pos(0)} {
+		if err := e.PlaylistRemoveTrack(ctx, playlist, track, p); !errors.Is(err, context.Canceled) {
+			t.Errorf("PlaylistRemoveTrack at position %v = %v, want the error of the canceled context", p, err)
+		}
+	}
+
 	// An episode is allowed, so the request gets to the (missing) player.
 	if err := e.PlaylistAddTracks(ctx, playlist, []string{"spotify:episode:4uLU6hMCjMI75M1A2tKUQC"}); !errors.Is(err, context.Canceled) {
 		t.Errorf("PlaylistAddTracks with an episode = %v, want the error of the canceled context", err)

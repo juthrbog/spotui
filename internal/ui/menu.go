@@ -27,14 +27,20 @@ type actionMenu struct {
 }
 
 // actionsFor returns the actions that apply to item. liked holds the known
-// liked states of tracks.
-func actionsFor(item *row, liked map[string]bool) []action {
+// liked states of tracks. playlist is the playlist that lists item, if the
+// user can change it.
+func actionsFor(item *row, liked map[string]bool, playlist ref) []action {
 	var out []action
 	if isTrackURI(item.uri) {
 		out = append(out, action{label: likeLabel(liked, item.uri), key: "l", run: (*Model).toggleLikeOf})
 	}
 	if canAddToPlaylist(item) {
 		out = append(out, action{label: "Add to playlist", run: (*Model).openPlaylistPicker})
+	}
+	if canAddToPlaylist(item) && playlist.uri != "" {
+		out = append(out, action{label: "Remove from this playlist", run: func(m *Model, item *row) tea.Cmd {
+			return m.confirmRemove(item, playlist)
+		}})
 	}
 	if isAlbumURI(item.uri) {
 		out = append(out, action{label: "Play", run: func(m *Model, item *row) tea.Cmd { return m.play(item.uri, "") }})
@@ -52,7 +58,7 @@ func (m *Model) openMenu() tea.Cmd {
 	if item == nil {
 		return m.setFlash("Select a track or play one first.", true)
 	}
-	items := actionsFor(item, m.liked)
+	items := actionsFor(item, m.liked, m.editablePlaylist())
 	if len(items) == 0 {
 		return m.setFlash("No actions for this item.", true)
 	}
