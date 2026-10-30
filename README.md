@@ -154,6 +154,7 @@ Spotify sets these limits on apps in development mode:
 | `pgup` / `pgdown` | Page up or down |
 | `enter` | Open the selected item, or play it |
 | `a` | Show the actions for the track or album |
+| `e` | Add the track to the queue |
 | `l` | Like or unlike the track |
 | `A` / `I` | Go to the album or the artist of the track |
 | `o` | Go to the playlist, album, or artist that plays |
@@ -174,7 +175,9 @@ To add a song or an episode to a playlist, select it, push `a`, and select "Add 
 
 To remove a song or an episode from a playlist that you can change, open the playlist, select the item, push `a`, and select "Remove from this playlist". spotui asks first, because adding the item again changes its position and date. Push `y` to remove the item, or `n` to keep it. If the playlist has the item more than one time, spotui removes only the selected copy. spotui cannot remove such a copy if a local file comes before it in the playlist, or if the playlist changed in another app in the last few minutes. In that case spotui removes nothing and tells you. Use the Spotify app to remove that copy.
 
-`a`, `l`, `A`, and `I` apply to the selected track or album. If no track or album is selected, they apply to the song that plays. If the item has more than one artist, `I` shows a list of the artists. Select one and push `enter`.
+Push `e` to add a song or an episode to the end of the queue. Queued items play in the order that you add them, after the song that plays now and before the rest of the playlist or album. If nothing plays, `e` plays the item at once. The now-playing bar shows the next track when spotui knows it. spotui cannot show the full queue or remove items from it yet.
+
+`a`, `e`, `l`, `A`, and `I` apply to the selected track or album. If no track or album is selected, they apply to the song that plays. If the item has more than one artist, `I` shows a list of the artists. Select one and push `enter`.
 
 Push `a` to show a menu of the actions for the item. The menu shows only the actions that apply. Each line shows its direct key, if it has one. Move with `↑` `↓` or `j` `k`, and push `enter` to run the action. You can also push the direct key of an action. Push `esc` to close the menu. An action that needs the Web API shows "needs L login" when you are not logged in.
 

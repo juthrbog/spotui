@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/devgianlu/go-librespot/daemon"
 
 	"github.com/juthrbog/spotui/internal/engine"
@@ -215,6 +216,9 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 		}
 		return tea.Batch(cmd, fetchStatus(m.ctx, m.eng, false))
 
+	case queueAddMsg:
+		return m.queueAdded(msg)
+
 	case flashClearMsg:
 		if msg.id != m.flashID {
 			return nil
@@ -407,6 +411,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.search.focusInput()
 	case "a":
 		return m.openMenu()
+	case "e":
+		return m.addToQueue()
 	case "l":
 		return m.toggleLike()
 	case "A":
@@ -578,6 +584,12 @@ func (m *Model) nowPlayingLines(w int) string {
 		details += " · " + t.AlbumName
 	}
 	line2 := "   " + styleDim.Render(details)
+	// The next track is a hint: it gets a third of the line at most, so the
+	// details of the track that plays stay readable.
+	if next := st.NextTrack; next != nil && next.Name != "" && w/3 >= 12 {
+		hint := ansi.Truncate("next: "+next.Name, w/3, "…")
+		line2 = spread(line2, styleDim.Render(hint)+" ", w)
+	}
 
 	pos, dur := t.Position, int64(t.Duration)
 	left, right := formatMs(pos), formatMs(dur)
@@ -659,6 +671,7 @@ func helpView() string {
 		{"pgup / pgdown", "page up / down"},
 		{"enter", "open or play"},
 		{"a", "actions for the track or album"},
+		{"e", "add the track to the queue"},
 		{"l", "like or unlike the track"},
 		{"A / I", "go to the album / artist of the track"},
 		{"o", "go to the playlist, album, or artist that plays"},

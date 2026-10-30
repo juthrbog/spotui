@@ -40,11 +40,12 @@ func (msg playlistChangedMsg) countChange() int32 {
 
 func isEpisodeURI(uri string) bool { return strings.HasPrefix(uri, "spotify:episode:") }
 
-// canAddToPlaylist reports whether item can go into a playlist.
-func canAddToPlaylist(item *row) bool { return isTrackURI(item.uri) || isEpisodeURI(item.uri) }
+// isSongOrEpisode reports whether item is a song or an episode, which can
+// go into a playlist or the queue.
+func isSongOrEpisode(item *row) bool { return isTrackURI(item.uri) || isEpisodeURI(item.uri) }
 
 func (m *Model) openPlaylistPicker(item *row) tea.Cmd {
-	if item == nil || !canAddToPlaylist(item) {
+	if item == nil || !isSongOrEpisode(item) {
 		return m.setFlash("Only songs and episodes can go into a playlist.", true)
 	}
 	return m.push(newPlaylistPicker(m, *item))

@@ -31,13 +31,16 @@ type actionMenu struct {
 // user can change it.
 func actionsFor(item *row, liked map[string]bool, playlist ref) []action {
 	var out []action
+	if isSongOrEpisode(item) {
+		out = append(out, action{label: "Add to queue", key: "e", run: (*Model).addToQueueOf})
+	}
 	if isTrackURI(item.uri) {
 		out = append(out, action{label: likeLabel(liked, item.uri), key: "l", run: (*Model).toggleLikeOf})
 	}
-	if canAddToPlaylist(item) {
+	if isSongOrEpisode(item) {
 		out = append(out, action{label: "Add to playlist", run: (*Model).openPlaylistPicker})
 	}
-	if canAddToPlaylist(item) && playlist.uri != "" {
+	if isSongOrEpisode(item) && playlist.uri != "" {
 		out = append(out, action{label: "Remove from this playlist", run: func(m *Model, item *row) tea.Cmd {
 			return m.confirmRemove(item, playlist)
 		}})

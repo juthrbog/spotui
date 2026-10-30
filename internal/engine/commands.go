@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	librespot "github.com/devgianlu/go-librespot"
 	"github.com/devgianlu/go-librespot/daemon"
 )
 
@@ -24,6 +25,19 @@ func (e *Engine) Status(ctx context.Context) (*daemon.ApiStatus, error) {
 // context starts at that track.
 func (e *Engine) Play(ctx context.Context, uri, skipTo string) error {
 	_, err := e.call(ctx, daemon.ApiRequestTypePlay, daemon.ApiPlay{Uri: uri, SkipToUri: skipTo})
+	return err
+}
+
+// AddToQueue adds a track or an episode to the end of the queue. When no
+// context is loaded, go-librespot drops the request but reports no error,
+// so check the status first.
+func (e *Engine) AddToQueue(ctx context.Context, uri string) error {
+	if _, err := canonicalURIs([]string{uri}, librespot.SpotifyIdTypeTrack, librespot.SpotifyIdTypeEpisode); err != nil {
+		return err
+	}
+	// The data must be a plain string. go-librespot type-asserts it without
+	// a check, so daemon.ApiAddToQueue or any other type panics.
+	_, err := e.call(ctx, daemon.ApiRequestTypeAddToQueue, uri)
 	return err
 }
 
