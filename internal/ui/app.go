@@ -385,6 +385,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.goToAlbum()
 	case "I":
 		return m.goToArtist()
+	case "o":
+		return m.goToContext()
 	case "L":
 		return m.startWebLogin()
 	case "R":
@@ -620,6 +622,7 @@ func helpView() string {
 		{"pgup / pgdown", "page up / down"},
 		{"enter", "open or play"},
 		{"A / I", "go to the album / artist of the track"},
+		{"o", "go to the playlist, album, or artist that plays"},
 		{"esc", "go back, stop typing, or clear the filter"},
 		{"", ""},
 		{"1 / 2 / tab", "library / search"},

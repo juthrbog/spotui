@@ -195,3 +195,90 @@ func TestRefs(t *testing.T) {
 		t.Errorf("refs = %+v, want %+v", got, want)
 	}
 }
+
+func playContext(m *Model, uri, name string) {
+	st := &daemon.ApiStatus{Username: "jakob", Track: trackOne, ContextUri: &uri}
+	if name != "" {
+		st.ContextName = &name
+	}
+	m.Update(statusMsg{st: st})
+}
+
+func TestGoToContextOpensPlayingContext(t *testing.T) {
+	m := newGoToModel(t, nil)
+	playContext(m, "spotify:album:a1", "Album One")
+
+	pressKey(m, 'o')
+	if got := currentTracks(t, m); got.uri != "spotify:album:a1" || got.name != "Album One" {
+		t.Errorf("o opened %q (%q), want spotify:album:a1 (Album One)", got.uri, got.name)
+	}
+}
+
+func TestGoToContextUsesFallbackName(t *testing.T) {
+	m := newGoToModel(t, nil)
+	playContext(m, "spotify:user:jakob:collection", "")
+
+	pressKey(m, 'o')
+	if got := currentTracks(t, m); got.name != "Liked Songs" {
+		t.Errorf("o opened a page named %q, want Liked Songs", got.name)
+	}
+}
+
+func TestGoToContextGoesBackToOpenPage(t *testing.T) {
+	m := newGoToModel(t, nil)
+	playContext(m, "spotify:playlist:1", "Mix")
+	open := openTracks(m, trackOne)
+	pressKey(m, 'A')
+	m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+
+	pressKey(m, 'o')
+	if m.tab != tabLibrary || m.current() != open {
+		t.Errorf("o went to tab %d page %T, want the open playlist page in the library tab", m.tab, m.current())
+	}
+	if n := len(m.stacks[tabLibrary]); n != 2 {
+		t.Errorf("library stack has %d pages, want 2", n)
+	}
+}
+
+// TestGoToContextFindsLikedSongsByOtherURI makes sure that o goes back to
+// the Liked Songs page of the library when the status uses the other URI
+// form for Liked Songs.
+func TestGoToContextFindsLikedSongsByOtherURI(t *testing.T) {
+	m := newGoToModel(t, nil)
+	playContext(m, "spotify:collection:tracks", "")
+	liked := newTracksPage(engine.LikedSongsURI("jakob"), "Liked Songs")
+	m.push(liked)
+	m.Update(tea.KeyPressMsg{Code: '2', Text: "2"})
+
+	pressKey(m, 'o')
+	if m.current() != liked {
+		t.Errorf("o opened %T, want the open Liked Songs page", m.current())
+	}
+}
+
+func TestGoToContextWithoutContextShowsMessage(t *testing.T) {
+	m := newGoToModel(t, trackOne)
+	pressKey(m, 'o')
+	if _, ok := m.current().(*libraryPage); !ok {
+		t.Errorf("o without a context opened %T", m.current())
+	}
+	if m.flash == "" || !m.flashErr {
+		t.Errorf("flash = %q (error %v), want an error message", m.flash, m.flashErr)
+	}
+}
+
+func TestContextKind(t *testing.T) {
+	cases := map[string]string{
+		"spotify:user:jakob:collection": "Liked Songs",
+		"spotify:collection:tracks":     "Liked Songs",
+		"spotify:album:1":               "Album",
+		"spotify:artist:1":              "Artist",
+		"spotify:show:1":                "Show",
+		"spotify:playlist:1":            "Playlist",
+	}
+	for uri, want := range cases {
+		if got := contextKind(uri); got != want {
+			t.Errorf("contextKind(%q) = %q, want %q", uri, got, want)
+		}
+	}
+}
