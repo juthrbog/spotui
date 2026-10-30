@@ -32,6 +32,7 @@ type row struct {
 
 	// Links of a track, for go to album and go to artist.
 	album   ref
+	pos     int // position in the full track list, for remove from playlist
 	artists []ref
 
 	// Shown in the side panel.

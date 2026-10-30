@@ -101,14 +101,14 @@ func TestPickerBeforePlayerIsReady(t *testing.T) {
 func TestPlaylistAddCountsTheNewTrack(t *testing.T) {
 	m := newGoToModel(t, nil)
 	m.Update(playlistsMsg{items: []daemon.ApiLibraryPlaylist{{Name: "Mine", Uri: "spotify:playlist:mine", CanEdit: true, Length: 12}}})
-	m.update(playlistAddMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", track: "Song"})
+	m.update(playlistChangedMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", track: "Song"})
 	if got := m.library.playlists[0].Length; got != 13 {
 		t.Errorf("Length = %d, want 13", got)
 	}
 	if text := strings.Join(rowTexts(&m.library.list), "\n"); !strings.Contains(text, "13 tracks") {
 		t.Errorf("library rows:\n%s", text)
 	}
-	m.update(playlistAddMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", err: errors.New("boom")})
+	m.update(playlistChangedMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", err: errors.New("boom")})
 	if got := m.library.playlists[0].Length; got != 13 {
 		t.Errorf("a failed add changed Length to %d", got)
 	}
@@ -120,7 +120,7 @@ func TestPlaylistAddResult(t *testing.T) {
 	m.push(page)
 	m.Update(contextTracksMsg{page: page, resp: &daemon.ApiContextTracks{Ready: true}})
 
-	m.update(playlistAddMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", track: "First Song"})
+	m.update(playlistChangedMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", track: "First Song"})
 	if m.flash != "Added First Song to Mine." || m.flashErr {
 		t.Errorf("flash = %q", m.flash)
 	}
@@ -129,7 +129,7 @@ func TestPlaylistAddResult(t *testing.T) {
 	}
 
 	forbidden := fmt.Errorf("failed appending to playlist: %w: %w", daemon.ErrForbidden, errors.New("403"))
-	m.update(playlistAddMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", track: "First Song", err: forbidden})
+	m.update(playlistChangedMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", track: "First Song", err: forbidden})
 	if m.flash != "You cannot change the playlist Mine." || !m.flashErr {
 		t.Errorf("forbidden flash = %q", m.flash)
 	}
@@ -137,7 +137,7 @@ func TestPlaylistAddResult(t *testing.T) {
 		t.Error("a failed add loaded the page again")
 	}
 
-	m.update(playlistAddMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", track: "First Song", err: errors.New("boom")})
+	m.update(playlistChangedMsg{playlistURI: "spotify:playlist:mine", playlist: "Mine", track: "First Song", err: errors.New("boom")})
 	if !strings.Contains(m.flash, "boom") || !m.flashErr {
 		t.Errorf("error flash = %q", m.flash)
 	}

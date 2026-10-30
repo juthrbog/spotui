@@ -104,9 +104,9 @@ func (p *tracksPage) update(m *Model, msg tea.Msg) tea.Cmd {
 		case p.resp != nil:
 			p.rebuild(m)
 		}
-	case playlistAddMsg:
-		if msg.err == nil && msg.playlistURI == p.uri {
-			// go-librespot dropped its copy of the playlist.
+	case playlistChangedMsg:
+		// After a change, go-librespot dropped its copy of the playlist.
+		if msg.playlistURI == p.uri && msg.err == nil {
 			return p.reload(m)
 		}
 	case tea.KeyPressMsg:
@@ -186,7 +186,7 @@ func (p *tracksPage) rebuild(m *Model) {
 			heart = "♥"
 		}
 		if it.Track == nil {
-			rows[i] = row{cols: []string{num, heart, "…"}, uri: it.Uri}
+			rows[i] = row{cols: []string{num, heart, "…"}, uri: it.Uri, pos: i}
 			continue
 		}
 		t := it.Track
@@ -194,6 +194,7 @@ func (p *tracksPage) rebuild(m *Model) {
 		r := trackRow(t)
 		r.cols = []string{num, heart, t.Name, artists, t.AlbumName, formatMs(int64(t.Duration))}
 		r.uri = it.Uri
+		r.pos = i
 		r.image = deref(t.AlbumCoverUrl)
 		r.info = []string{t.Name, artists, t.AlbumName}
 		rows[i] = r

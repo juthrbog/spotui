@@ -69,6 +69,7 @@ type Model struct {
 	flashID  int
 	help     bool
 	menu     *actionMenu
+	confirm  *confirmPrompt
 
 	liked       map[string]bool // track URI -> in Liked Songs
 	likedAsked  map[string]bool // track URIs asked for or loaded
@@ -215,9 +216,15 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 		return tea.Batch(cmd, fetchStatus(m.ctx, m.eng, false))
 
 	case flashClearMsg:
-		if msg.id == m.flashID {
-			m.flash = ""
+		if msg.id != m.flashID {
+			return nil
 		}
+		// The question hides the message, so keep it until the question
+		// closes.
+		if m.confirm != nil {
+			return m.setFlash(m.flash, m.flashErr)
+		}
+		m.flash = ""
 		return nil
 
 	case webLoginStartedMsg:
@@ -330,6 +337,9 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	if m.help {
 		m.help = false
 		return nil
+	}
+	if m.confirm != nil {
+		return m.confirmKey(key)
 	}
 	if m.menu != nil {
 		return m.menuKey(key)
@@ -583,6 +593,9 @@ func (m *Model) nowPlayingLines(w int) string {
 }
 
 func (m *Model) footerView(w int) string {
+	if m.confirm != nil {
+		return styleAccentBold.Render(fit(" "+m.confirm.question+" (y/n)", w, false))
+	}
 	if m.flash != "" {
 		style := styleAccent
 		if m.flashErr {

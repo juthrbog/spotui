@@ -61,6 +61,32 @@ func (e *Engine) PlaylistAddTracks(ctx context.Context, playlistURI string, uris
 	return err
 }
 
+// PlaylistRemoveTrack removes one item from a playlist. Without a position
+// it removes the first copy of uri. With a position, the item at that
+// index of the playlist must be uri. If it is not, the error wraps
+// spclient.ErrPlaylistConflict. A playlist that the user cannot change
+// gives an error that wraps daemon.ErrForbidden.
+//
+// go-librespot v0.10.5 checks the position against the full playlist, but
+// ContextTracks leaves out local files. So a position from ContextTracks
+// is only right when no local file comes before the item.
+func (e *Engine) PlaylistRemoveTrack(ctx context.Context, playlistURI, uri string, position *int) error {
+	if err := checkPlaylistURI(playlistURI); err != nil {
+		return err
+	}
+	if _, err := canonicalURIs([]string{uri}, librespot.SpotifyIdTypeTrack, librespot.SpotifyIdTypeEpisode); err != nil {
+		return err
+	}
+	// go-librespot indexes the playlist with the position without a check,
+	// so a negative position panics and stops the process.
+	if position != nil && *position < 0 {
+		return fmt.Errorf("negative playlist position %d", *position)
+	}
+	_, err := e.call(ctx, daemon.ApiRequestTypePlaylistRemoveTrack,
+		daemon.ApiPlaylistRemoveTrack{PlaylistUri: playlistURI, Uri: uri, Position: position})
+	return err
+}
+
 // SetLiked adds the tracks to Liked Songs, or removes them when liked is
 // false. go-librespot does not make the URIs canonical for this request, so
 // the wrapper does.
