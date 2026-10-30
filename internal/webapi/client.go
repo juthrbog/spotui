@@ -49,6 +49,13 @@ const maxRetryWait = 5 * time.Second
 
 // get calls GET path and decodes the JSON reply into out.
 func (c *Client) get(ctx context.Context, path string, query url.Values, out any) error {
+	return c.do(ctx, http.MethodGet, path, query, out)
+}
+
+// do calls path with method. When out is not nil, it decodes the JSON
+// reply into out. The calls of this client are all safe to repeat, so a
+// short rate limit is waited out and the call is made again.
+func (c *Client) do(ctx context.Context, method, path string, query url.Values, out any) error {
 	if !c.Configured() {
 		return ErrNotConfigured
 	}
@@ -76,7 +83,7 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 	}
 
 	for attempt := 0; ; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		req, err := http.NewRequestWithContext(ctx, method, u, nil)
 		if err != nil {
 			return err
 		}
@@ -93,7 +100,10 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 		}
 
 		switch resp.StatusCode {
-		case http.StatusOK:
+		case http.StatusOK, http.StatusCreated, http.StatusNoContent:
+			if out == nil {
+				return nil
+			}
 			if err := json.Unmarshal(body, out); err != nil {
 				return fmt.Errorf("parsing spotify web api reply: %w", err)
 			}
@@ -129,7 +139,13 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 			if e.Error.Message == "" {
 				e.Error.Message = http.StatusText(resp.StatusCode)
 			}
-			return &APIError{Status: resp.StatusCode, Message: e.Error.Message}
+			apiErr := &APIError{Status: resp.StatusCode, Message: e.Error.Message}
+			// Spotify answers "Insufficient client scope" when the login is
+			// older than a scope that the call needs.
+			if resp.StatusCode == http.StatusForbidden && strings.Contains(strings.ToLower(e.Error.Message), "scope") {
+				return fmt.Errorf("%w: %w", ErrMissingScope, apiErr)
+			}
+			return apiErr
 		}
 	}
 }
@@ -200,14 +216,14 @@ func (c *Client) ArtistAlbums(ctx context.Context, artistURI, group string) (alb
 	return albums, max(total, len(albums)), nil
 }
 
-// maxSavedAlbums caps how many saved albums are loaded, to keep the number
+// MaxSavedAlbums caps how many saved albums are loaded, to keep the number
 // of calls low.
-const maxSavedAlbums = 500
+const MaxSavedAlbums = 500
 
 // SavedAlbums returns the albums in the user's library, newest first.
 func (c *Client) SavedAlbums(ctx context.Context) ([]Album, error) {
 	var albums []Album
-	for offset := 0; offset < maxSavedAlbums; {
+	for offset := 0; offset < MaxSavedAlbums; {
 		var page struct {
 			Items []struct {
 				Album Album `json:"album"`

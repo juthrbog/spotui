@@ -119,7 +119,7 @@ After the login, the Library tab shows Liked Songs and your playlists. Select a 
 
 ## Set up search and saved albums
 
-Search, saved albums, and the albums on artist pages use the Spotify Web API. The Web API needs a client ID from your own Spotify developer app. A client ID is the public name of an app on the Spotify platform. Playback and playlists work without it.
+Search, saved albums, the albums on artist pages, and saving or removing albums use the Spotify Web API. The Web API needs a client ID from your own Spotify developer app. A client ID is the public name of an app on the Spotify platform. Playback and playlists work without it.
 
 1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and log in.
 2. Create an app. The name and description can be any text.
@@ -130,6 +130,13 @@ Search, saved albums, and the albums on artist pages use the Spotify Web API. Th
 7. Restart spotui.
 
 When spotui starts, it opens a second login page in your browser. Approve it. spotui saves this login too.
+
+The login asks Spotify for these permissions (scopes):
+
+- `user-library-read`: read your saved albums.
+- `user-library-modify`: save albums to your library and remove them.
+
+If you logged in with an older version of spotui, your login does not have `user-library-modify`. When you save or remove an album, spotui tells you to push `L` and log in again. You do this one time.
 
 You can also give the client ID in the `SPOTUI_CLIENT_ID` environment variable. The variable overrides the value in the configuration file.
 
@@ -176,6 +183,8 @@ To add a song or an episode to a playlist, select it, push `a`, and select "Add 
 To remove a song or an episode from a playlist that you can change, open the playlist, select the item, push `a`, and select "Remove from this playlist". spotui asks first, because adding the item again changes its position and date. Push `y` to remove the item, or `n` to keep it. If the playlist has the item more than one time, spotui removes only the selected copy. spotui cannot remove such a copy if a local file comes before it in the playlist, or if the playlist changed in another app in the last few minutes. In that case spotui removes nothing and tells you. Use the Spotify app to remove that copy.
 
 Push `e` to add a song or an episode to the end of the queue. Queued items play in the order that you add them, after the song that plays now and before the rest of the playlist or album. If nothing plays, `e` plays the item at once. The now-playing bar shows the next track when spotui knows it. spotui cannot show the full queue or remove items from it yet.
+
+To save an album to your library, select the album or one of its songs, push `a`, and select "Save album". If the album is in your library, the menu shows "Remove album". The Library tab shows the change. Saving albums needs the Web API.
 
 `a`, `e`, `l`, `A`, and `I` apply to the selected track or album. If no track or album is selected, they apply to the song that plays. If the item has more than one artist, `I` shows a list of the artists. Select one and push `enter`.
 

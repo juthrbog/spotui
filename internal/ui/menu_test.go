@@ -25,16 +25,16 @@ func TestActionsForItemTypes(t *testing.T) {
 		item row
 		want string
 	}{
-		{"track", trackRow(trackTwo), "Add to queue, Like or unlike, Add to playlist, Go to album, Go to artist"},
-		{"liked track", trackRow(trackOne), "Add to queue, Unlike, Add to playlist, Go to album, Go to artist"},
-		{"album", albumRow(webapi.Album{URI: "spotify:album:a", Name: "Rec", Artists: []webapi.Artist{{URI: "spotify:artist:b", Name: "Band"}}}), "Play, Go to artist"},
-		{"album without artist links", albumRow(webapi.Album{URI: "spotify:album:a", Name: "Rec"}), "Play"},
+		{"track", trackRow(trackTwo), "Add to queue, Like or unlike, Add to playlist, Go to album, Save or remove album, Go to artist"},
+		{"liked track", trackRow(trackOne), "Add to queue, Unlike, Add to playlist, Go to album, Save or remove album, Go to artist"},
+		{"album", albumRow(webapi.Album{URI: "spotify:album:a", Name: "Rec", Artists: []webapi.Artist{{URI: "spotify:artist:b", Name: "Band"}}}), "Play, Save or remove album, Go to artist"},
+		{"album without artist links", albumRow(webapi.Album{URI: "spotify:album:a", Name: "Rec"}), "Play, Save or remove album"},
 		{"episode", row{uri: "spotify:episode:e", album: ref{uri: "spotify:show:s", name: "Show"}}, "Add to queue, Add to playlist, Go to album"},
 		{"track still loading", row{uri: "spotify:track:9"}, "Add to queue, Like or unlike, Add to playlist"},
 	}
 	liked := map[string]bool{trackOne.Uri: true}
 	for _, c := range cases {
-		if got := labels(actionsFor(&c.item, liked, ref{})); got != c.want {
+		if got := labels(actionsFor(&c.item, menuState{liked: liked})); got != c.want {
 			t.Errorf("%s: actions = %q, want %q", c.name, got, c.want)
 		}
 	}
@@ -177,7 +177,7 @@ func TestMenuOnAlbumRowPlaysAlbum(t *testing.T) {
 		t.Fatalf("selection = %+v, want the album", sel)
 	}
 	pressKey(m, 'a')
-	if m.menu == nil || labels(m.menu.items) != "Play" {
+	if m.menu == nil || labels(m.menu.items) != "Play, Remove album" {
 		t.Fatalf("menu = %+v, want Play", m.menu)
 	}
 }

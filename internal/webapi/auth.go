@@ -13,7 +13,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,7 +29,18 @@ var (
 	ErrNotConfigured = errors.New("no Spotify developer app client ID is set")
 	// ErrNotLoggedIn means there is no valid Web API token.
 	ErrNotLoggedIn = errors.New("not logged in to the Spotify Web API")
+	// ErrMissingScope means the login does not allow the call. The login is
+	// older than a scope that the call needs, so a new login fixes it.
+	ErrMissingScope = errors.New("the Web API login does not allow this")
 )
+
+// ScopeLibraryModify allows changes to the library of the user, such as
+// saving albums.
+const ScopeLibraryModify = "user-library-modify"
+
+// scopes are the scopes that a login asks for. A login asks for all of
+// them, so a new feature needs one new login at most.
+var scopes = []string{"user-library-read", ScopeLibraryModify}
 
 var endpoint = oauth2.Endpoint{ // #nosec G101 -- public OAuth URLs, no credentials
 	AuthURL:  "https://accounts.spotify.com/authorize",
@@ -44,8 +57,9 @@ type Client struct {
 	port      int
 	baseURL   string
 
-	mu sync.Mutex
-	ts oauth2.TokenSource // nil when not logged in
+	mu    sync.Mutex
+	ts    oauth2.TokenSource // nil when not logged in
+	scope string             // scopes that the login allows, separated by spaces
 }
 
 // New creates a client. It loads a saved token from tokenPath if one exists.
@@ -59,13 +73,22 @@ func New(clientID string, port int, tokenPath string) *Client {
 			ClientID:    clientID,
 			Endpoint:    endpoint,
 			RedirectURL: "http://127.0.0.1:" + strconv.Itoa(port) + "/callback",
-			Scopes:      []string{"user-library-read"},
+			Scopes:      scopes,
 		},
 	}
-	if tok, err := c.loadToken(); err == nil {
-		c.ts = c.tokenSource(tok)
+	if saved, err := c.loadToken(); err == nil {
+		c.ts = c.tokenSource(saved.Token)
+		c.scope = saved.Scope
 	}
 	return c
+}
+
+// HasScope reports whether the login allows scope. A token that spotui
+// saved before it kept the scopes counts as allowing none.
+func (c *Client) HasScope(scope string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.ts != nil && slices.Contains(strings.Fields(c.scope), scope)
 }
 
 // Configured reports whether a client ID is set.
@@ -188,7 +211,7 @@ func (l *Login) Wait(ctx context.Context) error {
 // Logout forgets the token and deletes the token file.
 func (c *Client) Logout() error {
 	c.mu.Lock()
-	c.ts = nil
+	c.ts, c.scope = nil, ""
 	c.mu.Unlock()
 	if err := os.Remove(c.tokenPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("removing Web API token: %w", err)
@@ -230,23 +253,39 @@ func (s *savingTokenSource) Token() (*oauth2.Token, error) {
 	return tok, nil
 }
 
-func (c *Client) loadToken() (*oauth2.Token, error) {
+// savedToken is the token file: the token and the scopes that it allows.
+type savedToken struct {
+	*oauth2.Token
+	Scope string `json:"scope,omitempty"`
+}
+
+func (c *Client) loadToken() (*savedToken, error) {
 	b, err := os.ReadFile(c.tokenPath)
 	if err != nil {
 		return nil, err
 	}
-	var tok oauth2.Token
-	if err := json.Unmarshal(b, &tok); err != nil {
+	saved := savedToken{Token: &oauth2.Token{}}
+	if err := json.Unmarshal(b, &saved); err != nil {
 		return nil, err
 	}
-	if tok.RefreshToken == "" {
+	if saved.RefreshToken == "" {
 		return nil, errors.New("saved token has no refresh token")
 	}
-	return &tok, nil
+	return &saved, nil
 }
 
+// saveToken saves tok with its scopes. A refreshed token often does not
+// name its scopes, and then the scopes of the login stay.
 func (c *Client) saveToken(tok *oauth2.Token) error {
-	b, err := json.Marshal(tok) // #nosec G117 -- the token is meant to be saved; atomicfile makes the file 0600
+	scope, _ := tok.Extra("scope").(string)
+	c.mu.Lock()
+	if scope != "" {
+		c.scope = scope
+	} else {
+		scope = c.scope
+	}
+	c.mu.Unlock()
+	b, err := json.Marshal(savedToken{Token: tok, Scope: scope}) // #nosec G117 -- the token is meant to be saved; atomicfile makes the file 0600
 	if err != nil {
 		return err
 	}

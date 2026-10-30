@@ -77,6 +77,9 @@ func (p *libraryPage) update(m *Model, msg tea.Msg) tea.Cmd {
 	case albumsMsg:
 		p.albumsLoading = false
 		p.albums, p.albumsErr = msg.items, msg.err
+		if msg.err == nil {
+			m.albums.loaded(msg.items)
+		}
 		p.rebuild(m)
 		if errors.Is(msg.err, webapi.ErrNotLoggedIn) {
 			return m.startWebLogin()
