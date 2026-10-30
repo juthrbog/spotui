@@ -234,7 +234,7 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 			}
 			return m.setFlash("Web API login failed: "+msg.err.Error(), true)
 		}
-		cmds := []tea.Cmd{m.setFlash("Logged in. Search and saved albums are ready.", false), m.library.loadAlbums(m)}
+		cmds := []tea.Cmd{m.setFlash("Logged in. Search and albums are ready.", false), m.library.loadAlbums(m), m.reloadArtistPages()}
 		if q := m.search.pending; q != "" {
 			cmds = append(cmds, m.search.run(m, q))
 		}

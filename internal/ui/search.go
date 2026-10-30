@@ -123,6 +123,8 @@ func (p *searchPage) update(m *Model, msg tea.Msg) tea.Cmd {
 			case r == nil:
 			case r.play:
 				return m.play(r.uri, "")
+			case strings.HasPrefix(r.uri, "spotify:artist:"):
+				return m.openArtist(r.uri, r.label)
 			default:
 				return m.push(newTracksPage(r.uri, r.label))
 			}
@@ -188,7 +190,7 @@ func (p *searchPage) rebuild() {
 		section("Artists")
 		for _, a := range res.Artists.Items {
 			rows = append(rows, row{
-				cols:  []string{a.Name, "top tracks"},
+				cols:  []string{a.Name, "artist"},
 				uri:   a.URI,
 				label: a.Name,
 				image: webapi.PickImage(a.Images),

@@ -23,6 +23,7 @@ const (
 type tracksPage struct {
 	uri    string
 	name   string
+	hint   string // line shown above the list
 	list   list
 	filter filterBar
 
@@ -135,8 +136,12 @@ func (p *tracksPage) rebuild() {
 
 func (p *tracksPage) view(m *Model, width, height int) string {
 	head := ""
+	if p.hint != "" {
+		head = styleDim.Render(fit(p.hint, width, false)) + "\n"
+		height--
+	}
 	if p.filter.active() {
-		head = p.filter.view(&p.list, width) + "\n"
+		head += p.filter.view(&p.list, width) + "\n"
 		height--
 	}
 	switch {
