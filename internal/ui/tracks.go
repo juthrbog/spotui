@@ -31,6 +31,11 @@ type tracksPage struct {
 	err        error
 	lastCached int
 	stalls     int
+
+	// gen counts the loads of the list. A reload starts a new load, and the
+	// replies of the old one are dropped, so only one poll runs at a time.
+	gen       int
+	reloading bool // keep the old rows until the new list is ready
 }
 
 func newTracksPage(uri, name string) *tracksPage {
@@ -40,6 +45,7 @@ func newTracksPage(uri, name string) *tracksPage {
 		filter: newFilterBar(),
 		list: list{columns: []column{
 			{width: 4, right: true},
+			{width: 1}, // ♥ for liked tracks
 			{weight: 4},
 			{weight: 3},
 			{weight: 3},
@@ -68,29 +74,36 @@ func (p *tracksPage) title() string {
 func (p *tracksPage) update(m *Model, msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case contextTracksMsg:
-		if msg.page != p {
+		if msg.page != p || msg.gen != p.gen {
 			return nil
 		}
 		if msg.err != nil {
 			p.err = msg.err
 			return nil
 		}
+		if p.reloading && !msg.resp.Ready {
+			return fetchContextTracks(m.ctx, m.eng, p, tracksPollInterval)
+		}
+		p.reloading = false
 		p.err = nil
 		p.resp = msg.resp
-		p.rebuild()
-		if msg.resp.Ready && msg.resp.Cached >= msg.resp.Length {
-			return nil
+		liked := p.loadLiked(m)
+		p.rebuild(m)
+		return tea.Batch(liked, p.poll(m))
+	case likedStatesMsg:
+		if p.resp != nil {
+			p.rebuild(m)
 		}
-		if msg.resp.Ready && msg.resp.Cached == p.lastCached {
-			p.stalls++
-		} else {
-			p.stalls = 0
+	case likedSetMsg:
+		switch {
+		case msg.err != nil:
+		case isLikedSongs(p.uri):
+			// go-librespot dropped its copy of Liked Songs, so this loads
+			// the new list.
+			return p.reload(m)
+		case p.resp != nil:
+			p.rebuild(m)
 		}
-		p.lastCached = msg.resp.Cached
-		if p.stalls >= tracksMaxStalls {
-			return nil
-		}
-		return fetchContextTracks(m.ctx, m.eng, p, tracksPollInterval)
 	case tea.KeyPressMsg:
 		if p.filter.typing {
 			return p.filter.update(&p.list, msg)
@@ -114,18 +127,67 @@ func (p *tracksPage) update(m *Model, msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-func (p *tracksPage) rebuild() {
+// reload loads the list again. The old rows stay on screen, with the
+// cursor, until the new list is ready.
+func (p *tracksPage) reload(m *Model) tea.Cmd {
+	p.gen++
+	p.stalls, p.lastCached = 0, 0
+	p.reloading = p.resp != nil
+	return fetchContextTracks(m.ctx, m.eng, p, 0)
+}
+
+// poll asks for the list again until every track has its details.
+func (p *tracksPage) poll(m *Model) tea.Cmd {
+	resp := p.resp
+	if resp.Ready && resp.Cached >= resp.Length {
+		return nil
+	}
+	if resp.Ready && resp.Cached == p.lastCached {
+		p.stalls++
+	} else {
+		p.stalls = 0
+	}
+	p.lastCached = resp.Cached
+	if p.stalls >= tracksMaxStalls {
+		return nil
+	}
+	return fetchContextTracks(m.ctx, m.eng, p, tracksPollInterval)
+}
+
+// loadLiked loads whether the tracks of the list are liked. Every track in
+// Liked Songs is liked, so that list needs no request.
+func (p *tracksPage) loadLiked(m *Model) tea.Cmd {
+	uris := make([]string, len(p.resp.Tracks))
+	for i, it := range p.resp.Tracks {
+		uris[i] = it.Uri
+	}
+	if !isLikedSongs(p.uri) {
+		return m.wantLiked(uris)
+	}
+	for _, uri := range uris {
+		m.liked[uri], m.likedAsked[uri] = true, true
+	}
+	return nil
+}
+
+func (p *tracksPage) rebuild(m *Model) {
+	// In Liked Songs every track is liked, so the hearts would only add noise.
+	hearts := !isLikedSongs(p.uri)
 	rows := make([]row, len(p.resp.Tracks))
 	for i, it := range p.resp.Tracks {
 		num := strconv.Itoa(i + 1)
+		heart := ""
+		if hearts && m.liked[it.Uri] {
+			heart = "♥"
+		}
 		if it.Track == nil {
-			rows[i] = row{cols: []string{num, "…"}, uri: it.Uri}
+			rows[i] = row{cols: []string{num, heart, "…"}, uri: it.Uri}
 			continue
 		}
 		t := it.Track
 		artists := strings.Join(t.ArtistNames, ", ")
 		r := trackRow(t)
-		r.cols = []string{num, t.Name, artists, t.AlbumName, formatMs(int64(t.Duration))}
+		r.cols = []string{num, heart, t.Name, artists, t.AlbumName, formatMs(int64(t.Duration))}
 		r.uri = it.Uri
 		r.image = deref(t.AlbumCoverUrl)
 		r.info = []string{t.Name, artists, t.AlbumName}

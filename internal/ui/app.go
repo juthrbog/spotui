@@ -69,11 +69,18 @@ type Model struct {
 	flashID  int
 	help     bool
 	menu     *actionMenu
+
+	liked       map[string]bool // track URI -> in Liked Songs
+	likedAsked  map[string]bool // track URIs asked for or loaded
+	likePending map[string]bool // track URIs with a like change on the way
 }
 
 // New creates the root model.
 func New(ctx context.Context, eng *engine.Engine, web *webapi.Client, info Info) *Model {
-	m := &Model{ctx: ctx, eng: eng, web: web, info: info, art: newArtState(info.CoverArt)}
+	m := &Model{
+		ctx: ctx, eng: eng, web: web, info: info, art: newArtState(info.CoverArt),
+		liked: map[string]bool{}, likedAsked: map[string]bool{}, likePending: map[string]bool{},
+	}
 	m.library = newLibraryPage()
 	m.search = newSearchPage()
 	m.stacks[tabLibrary] = []page{m.library}
@@ -247,7 +254,7 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 	if ct, ok := msg.(contextTracksMsg); ok && !m.onStack(ct.page) {
 		return nil
 	}
-	var cmds []tea.Cmd
+	cmds := []tea.Cmd{m.updateLiked(msg)}
 	for _, s := range m.stacks {
 		for _, p := range s {
 			cmds = append(cmds, p.update(m, msg))
@@ -302,6 +309,9 @@ func (m *Model) handleStatus(msg statusMsg) tea.Cmd {
 	// The player only answers once it is logged in.
 	m.status = msg.st
 	m.auth = nil
+	if uri := m.playingURI(); uri != "" {
+		cmds = append(cmds, m.wantLiked([]string{uri}))
+	}
 	if !m.ready {
 		m.ready = true
 		cmds = append(cmds, m.library.load(m))
@@ -387,6 +397,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.search.focusInput()
 	case "a":
 		return m.openMenu()
+	case "l":
+		return m.toggleLike()
 	case "A":
 		return m.goToAlbum()
 	case "I":
@@ -545,7 +557,11 @@ func (m *Model) nowPlayingLines(w int) string {
 		volume = int(st.Volume * 100 / st.VolumeSteps)
 	}
 	indicators := shuffle + "  " + repeat + "  " + styleDim.Render(fmt.Sprintf("vol %d%%", volume)) + " "
-	line1 := spread(" "+styleAccent.Render(icon)+" "+styleBold.Render(t.Name), indicators, w)
+	title := " " + styleAccent.Render(icon) + " " + styleBold.Render(t.Name)
+	if m.liked[t.Uri] {
+		title += " " + styleAccent.Render("♥")
+	}
+	line1 := spread(title, indicators, w)
 
 	details := strings.Join(t.ArtistNames, ", ")
 	if t.AlbumName != "" {
@@ -630,6 +646,7 @@ func helpView() string {
 		{"pgup / pgdown", "page up / down"},
 		{"enter", "open or play"},
 		{"a", "actions for the track or album"},
+		{"l", "like or unlike the track"},
 		{"A / I", "go to the album / artist of the track"},
 		{"o", "go to the playlist, album, or artist that plays"},
 		{"esc", "go back, stop typing, or clear the filter"},

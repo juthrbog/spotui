@@ -26,9 +26,13 @@ type actionMenu struct {
 	cursor int
 }
 
-// actionsFor returns the actions that apply to item.
-func actionsFor(item *row) []action {
+// actionsFor returns the actions that apply to item. liked holds the known
+// liked states of tracks.
+func actionsFor(item *row, liked map[string]bool) []action {
 	var out []action
+	if isTrackURI(item.uri) {
+		out = append(out, action{label: likeLabel(liked, item.uri), key: "l", run: (*Model).toggleLikeOf})
+	}
 	if isAlbumURI(item.uri) {
 		out = append(out, action{label: "Play", run: func(m *Model, item *row) tea.Cmd { return m.play(item.uri, "") }})
 	} else if item.album.uri != "" {
@@ -45,7 +49,7 @@ func (m *Model) openMenu() tea.Cmd {
 	if item == nil {
 		return m.setFlash("Select a track or play one first.", true)
 	}
-	items := actionsFor(item)
+	items := actionsFor(item, m.liked)
 	if len(items) == 0 {
 		return m.setFlash("No actions for this item.", true)
 	}

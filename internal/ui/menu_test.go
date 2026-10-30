@@ -25,14 +25,16 @@ func TestActionsForItemTypes(t *testing.T) {
 		item row
 		want string
 	}{
-		{"track", trackRow(trackTwo), "Go to album, Go to artist"},
+		{"track", trackRow(trackTwo), "Like or unlike, Go to album, Go to artist"},
+		{"liked track", trackRow(trackOne), "Unlike, Go to album, Go to artist"},
 		{"album", albumRow(webapi.Album{URI: "spotify:album:a", Name: "Rec", Artists: []webapi.Artist{{URI: "spotify:artist:b", Name: "Band"}}}), "Play, Go to artist"},
 		{"album without artist links", albumRow(webapi.Album{URI: "spotify:album:a", Name: "Rec"}), "Play"},
 		{"episode", row{uri: "spotify:episode:e", album: ref{uri: "spotify:show:s", name: "Show"}}, "Go to album"},
-		{"track still loading", row{uri: "spotify:track:9"}, ""},
+		{"track still loading", row{uri: "spotify:track:9"}, "Like or unlike"},
 	}
+	liked := map[string]bool{trackOne.Uri: true}
 	for _, c := range cases {
-		if got := labels(actionsFor(&c.item)); got != c.want {
+		if got := labels(actionsFor(&c.item, liked)); got != c.want {
 			t.Errorf("%s: actions = %q, want %q", c.name, got, c.want)
 		}
 	}
@@ -51,12 +53,13 @@ func TestMenuRunsActionForSelectedTrack(t *testing.T) {
 	if !strings.Contains(frame, "Second Song") {
 		t.Errorf("frame does not show the title:\n%s", frame)
 	}
-	for _, want := range [][2]string{{"Go to album", "A"}, {"Go to artist", "I"}} {
+	for _, want := range [][2]string{{"Like or unlike", "l"}, {"Go to album", "A"}, {"Go to artist", "I"}} {
 		if !menuLineHasKey(frame, want[0], want[1]) {
 			t.Errorf("no menu line shows %q with its key %q:\n%s", want[0], want[1], frame)
 		}
 	}
 
+	pressKey(m, 'j')
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.menu != nil {
 		t.Error("menu is still open after enter")
@@ -89,7 +92,7 @@ func TestMenuKeepsItsItem(t *testing.T) {
 	pressKey(m, 'a')
 	m.Update(statusMsg{st: &daemon.ApiStatus{Username: "jakob", Track: trackTwo}})
 
-	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	pressKey(m, 'A')
 	if got := currentTracks(t, m); got.uri != "spotify:album:a1" {
 		t.Errorf("Go to album opened %q, want the album of the track in the menu", got.uri)
 	}
