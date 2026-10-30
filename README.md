@@ -153,6 +153,7 @@ Spotify sets these limits on apps in development mode:
 | `g` / `G` | First or last item |
 | `pgup` / `pgdown` | Page up or down |
 | `enter` | Open the selected item, or play it |
+| `a` | Show the actions for the track or album |
 | `A` / `I` | Go to the album or the artist of the track |
 | `o` | Go to the playlist, album, or artist that plays |
 | `esc` | Go back, or clear the filter |
@@ -166,7 +167,9 @@ Spotify sets these limits on apps in development mode:
 
 To filter a list, push `f` and type. The list shows only the items that contain every word that you type, for example `beatles abbey`. The filter works in the Library tab and in each track list. It uses no Web API calls. Push `enter` to keep the filter and go to the list, or push `esc` to clear it.
 
-`A` and `I` apply to the selected track. If no track is selected, they apply to the song that plays. If the track has more than one artist, `I` shows a list of the artists. Select one and push `enter`.
+`a`, `A`, and `I` apply to the selected track or album. If no track or album is selected, they apply to the song that plays. If the item has more than one artist, `I` shows a list of the artists. Select one and push `enter`.
+
+Push `a` to show a menu of the actions for the item. The menu shows only the actions that apply. Each line shows its direct key, if it has one. Move with `↑` `↓` or `j` `k`, and push `enter` to run the action. You can also push the direct key of an action. Push `esc` to close the menu. An action that needs the Web API shows "needs L login" when you are not logged in.
 
 An artist page has a row that plays the artist and a row that shows all tracks of the artist. Below them, it shows the albums, singles and EPs, compilations, and albums that the artist appears on. Select an album and push `enter` to see its tracks. The albums come from the Web API. Without the Web API, the artist page shows only the tracks of the artist.
 

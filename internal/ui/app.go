@@ -68,6 +68,7 @@ type Model struct {
 	flashErr bool
 	flashID  int
 	help     bool
+	menu     *actionMenu
 }
 
 // New creates the root model.
@@ -320,6 +321,9 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.help = false
 		return nil
 	}
+	if m.menu != nil {
+		return m.menuKey(key)
+	}
 	if m.webLoginURL != "" && key == "esc" {
 		if m.webLoginCancel != nil {
 			m.webLoginCancel()
@@ -381,6 +385,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.tab = tabSearch
 		m.stacks[tabSearch] = m.stacks[tabSearch][:1]
 		return m.search.focusInput()
+	case "a":
+		return m.openMenu()
 	case "A":
 		return m.goToAlbum()
 	case "I":
@@ -446,13 +452,13 @@ func (m *Model) render() string {
 		const sep = " │ "
 		listWidth := w - panelWidth - lipgloss.Width(sep)
 		body = joinColumns(
-			fitBlock(m.current().view(m, listWidth, bodyHeight), listWidth, bodyHeight),
+			m.overlayMenu(m.current().view(m, listWidth, bodyHeight), listWidth, bodyHeight),
 			listWidth,
 			styleDim.Render(sep),
 			fitBlock(m.panelView(panelWidth), panelWidth, bodyHeight),
 		)
 	default:
-		body = m.current().view(m, w, bodyHeight)
+		body = m.overlayMenu(m.current().view(m, w, bodyHeight), w, bodyHeight)
 	}
 
 	parts := []string{
@@ -568,8 +574,10 @@ func (m *Model) footerView(w int) string {
 		}
 		return style.Render(fit(" "+m.flash, w, false))
 	}
-	hint := " space play/pause · n/p next/prev · ←/→ seek · +/- volume · s shuffle · r repeat · f filter · / search · ? help · q quit"
-	if cur := m.current(); cur.typing() {
+	hint := " space play/pause · n/p next/prev · ←/→ seek · +/- volume · s shuffle · r repeat · a actions · f filter · / search · ? help · q quit"
+	if m.menu != nil {
+		hint = " ↑/↓ move · enter run · esc close · ctrl+c quit"
+	} else if cur := m.current(); cur.typing() {
 		if _, ok := cur.(*searchPage); ok {
 			hint = " typing in the search box · enter search · esc stop typing · tab switch tab · ctrl+c quit"
 		} else {
@@ -621,6 +629,7 @@ func helpView() string {
 		{"g / G", "first / last item"},
 		{"pgup / pgdown", "page up / down"},
 		{"enter", "open or play"},
+		{"a", "actions for the track or album"},
 		{"A / I", "go to the album / artist of the track"},
 		{"o", "go to the playlist, album, or artist that plays"},
 		{"esc", "go back, stop typing, or clear the filter"},

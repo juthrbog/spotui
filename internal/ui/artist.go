@@ -39,7 +39,7 @@ type artistPage struct {
 // openArtist opens the artist page, or the artist as a track list when the
 // Web API is not ready.
 func (m *Model) openArtist(uri, name string) tea.Cmd {
-	if m.web.Configured() && m.web.LoggedIn() {
+	if m.webReady() {
 		return m.push(newArtistPage(uri, name))
 	}
 	p := newTracksPage(uri, name)
@@ -173,14 +173,7 @@ func (p *artistPage) rebuild() {
 			continue
 		}
 		for _, a := range loaded.albums {
-			artists := webapi.ArtistNames(a.Artists)
-			rows = append(rows, row{
-				cols:  []string{a.Name, artists, a.Year()},
-				uri:   a.URI,
-				label: a.Name,
-				image: webapi.PickImage(a.Images),
-				info:  []string{a.Name, artists, albumKind(a)},
-			})
+			rows = append(rows, albumRow(a))
 		}
 		if loaded.total > len(loaded.albums) {
 			rows = append(rows, note(fmt.Sprintf("Showing the first %d of %d.", len(loaded.albums), loaded.total)))
