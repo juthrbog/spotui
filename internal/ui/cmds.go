@@ -32,6 +32,7 @@ type (
 	}
 	contextTracksMsg struct {
 		page *tracksPage
+		gen  int // load of the page that the reply belongs to
 		resp *daemon.ApiContextTracks
 		err  error
 	}
@@ -90,6 +91,7 @@ func loadAlbums(ctx context.Context, web *webapi.Client) tea.Cmd {
 }
 
 func fetchContextTracks(ctx context.Context, eng *engine.Engine, page *tracksPage, delay time.Duration) tea.Cmd {
+	uri, gen := page.uri, page.gen
 	return func() tea.Msg {
 		if delay > 0 {
 			select {
@@ -100,8 +102,8 @@ func fetchContextTracks(ctx context.Context, eng *engine.Engine, page *tracksPag
 		}
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
-		resp, err := eng.ContextTracks(ctx, page.uri)
-		return contextTracksMsg{page: page, resp: resp, err: err}
+		resp, err := eng.ContextTracks(ctx, uri)
+		return contextTracksMsg{page: page, gen: gen, resp: resp, err: err}
 	}
 }
 
