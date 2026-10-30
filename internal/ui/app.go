@@ -75,6 +75,9 @@ type Model struct {
 	liked       map[string]bool // track URI -> in Liked Songs
 	likedAsked  map[string]bool // track URIs asked for or loaded
 	likePending map[string]bool // track URIs with a like change on the way
+
+	albums       albumStates     // album URI -> in the library of the user
+	albumPending map[string]bool // album URIs with a change on the way
 }
 
 // New creates the root model.
@@ -82,6 +85,7 @@ func New(ctx context.Context, eng *engine.Engine, web *webapi.Client, info Info)
 	m := &Model{
 		ctx: ctx, eng: eng, web: web, info: info, art: newArtState(info.CoverArt),
 		liked: map[string]bool{}, likedAsked: map[string]bool{}, likePending: map[string]bool{},
+		albums: albumStates{saved: map[string]bool{}}, albumPending: map[string]bool{},
 	}
 	m.library = newLibraryPage()
 	m.search = newSearchPage()
@@ -215,6 +219,9 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 			cmd = m.setFlash(msg.err.Error(), true)
 		}
 		return tea.Batch(cmd, fetchStatus(m.ctx, m.eng, false))
+
+	case albumSavedMsg:
+		return m.albumSavedDone(msg)
 
 	case queueAddMsg:
 		return m.queueAdded(msg)

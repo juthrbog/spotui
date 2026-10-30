@@ -26,21 +26,26 @@ type actionMenu struct {
 	cursor int
 }
 
-// actionsFor returns the actions that apply to item. liked holds the known
-// liked states of tracks. playlist is the playlist that lists item, if the
-// user can change it.
-func actionsFor(item *row, liked map[string]bool, playlist ref) []action {
+// menuState is what the menu needs to know besides the item.
+type menuState struct {
+	liked    map[string]bool // known liked states of tracks
+	albums   albumStates     // known saved states of albums
+	playlist ref             // the playlist that lists the item, if the user can change it
+}
+
+// actionsFor returns the actions that apply to item.
+func actionsFor(item *row, s menuState) []action {
 	var out []action
 	if isSongOrEpisode(item) {
 		out = append(out, action{label: "Add to queue", key: "e", run: (*Model).addToQueueOf})
 	}
 	if isTrackURI(item.uri) {
-		out = append(out, action{label: likeLabel(liked, item.uri), key: "l", run: (*Model).toggleLikeOf})
+		out = append(out, action{label: likeLabel(s.liked, item.uri), key: "l", run: (*Model).toggleLikeOf})
 	}
 	if isSongOrEpisode(item) {
 		out = append(out, action{label: "Add to playlist", run: (*Model).openPlaylistPicker})
 	}
-	if isSongOrEpisode(item) && playlist.uri != "" {
+	if playlist := s.playlist; isSongOrEpisode(item) && playlist.uri != "" {
 		out = append(out, action{label: "Remove from this playlist", run: func(m *Model, item *row) tea.Cmd {
 			return m.confirmRemove(item, playlist)
 		}})
@@ -49,6 +54,9 @@ func actionsFor(item *row, liked map[string]bool, playlist ref) []action {
 		out = append(out, action{label: "Play", run: func(m *Model, item *row) tea.Cmd { return m.play(item.uri, "") }})
 	} else if item.album.uri != "" {
 		out = append(out, action{label: "Go to album", key: "A", run: (*Model).goToAlbumOf})
+	}
+	if a := albumOf(item); a.uri != "" {
+		out = append(out, action{label: albumLabel(s.albums, a.uri), needsWeb: true, run: (*Model).toggleAlbumOf})
 	}
 	if len(item.artists) > 0 {
 		out = append(out, action{label: "Go to artist", key: "I", run: (*Model).goToArtistOf})
@@ -61,7 +69,7 @@ func (m *Model) openMenu() tea.Cmd {
 	if item == nil {
 		return m.setFlash("Select a track or play one first.", true)
 	}
-	items := actionsFor(item, m.liked, m.editablePlaylist())
+	items := actionsFor(item, menuState{liked: m.liked, albums: m.albums, playlist: m.editablePlaylist()})
 	if len(items) == 0 {
 		return m.setFlash("No actions for this item.", true)
 	}
