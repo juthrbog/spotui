@@ -87,6 +87,15 @@ func TestLibraryWrappersCheckBeforeSending(t *testing.T) {
 		}
 	}
 
+	for _, uri := range []string{"spotify:album:4uLU6hMCjMI75M1A2tKUQC", "spotify:local:a:b:c:1", ""} {
+		if err := e.AddToQueue(ctx, uri); err == nil || errors.Is(err, context.Canceled) {
+			t.Errorf("AddToQueue(%q) = %v, want a check error", uri, err)
+		}
+	}
+	if err := e.AddToQueue(ctx, track); !errors.Is(err, context.Canceled) {
+		t.Errorf("AddToQueue(track) = %v, want the error of the canceled context", err)
+	}
+
 	// An episode is allowed, so the request gets to the (missing) player.
 	if err := e.PlaylistAddTracks(ctx, playlist, []string{"spotify:episode:4uLU6hMCjMI75M1A2tKUQC"}); !errors.Is(err, context.Canceled) {
 		t.Errorf("PlaylistAddTracks with an episode = %v, want the error of the canceled context", err)
