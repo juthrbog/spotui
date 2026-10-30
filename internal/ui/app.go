@@ -254,7 +254,7 @@ func (m *Model) update(msg tea.Msg) tea.Cmd {
 	if ct, ok := msg.(contextTracksMsg); ok && !m.onStack(ct.page) {
 		return nil
 	}
-	cmds := []tea.Cmd{m.updateLiked(msg)}
+	cmds := []tea.Cmd{m.updateLiked(msg), m.updatePlaylists(msg)}
 	for _, s := range m.stacks {
 		for _, p := range s {
 			cmds = append(cmds, p.update(m, msg))

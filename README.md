@@ -170,6 +170,8 @@ To filter a list, push `f` and type. The list shows only the items that contain 
 
 Push `l` to add the track to Liked Songs. If the track is in Liked Songs, `l` removes it. A message shows the result. The now-playing bar and the track lists show ♥ for liked songs. A track list loads the hearts after it shows the tracks. Liked Songs shows no hearts, because all of its songs are liked. Liking works without the Web API.
 
+To add a song or an episode to a playlist, select it, push `a`, and select "Add to playlist". spotui shows the playlists that you can change: your own playlists and collaborative playlists. Push `f` to filter them. Select a playlist and push `enter`. spotui adds the item to the end of the playlist. Adding to a playlist works without the Web API.
+
 `a`, `l`, `A`, and `I` apply to the selected track or album. If no track or album is selected, they apply to the song that plays. If the item has more than one artist, `I` shows a list of the artists. Select one and push `enter`.
 
 Push `a` to show a menu of the actions for the item. The menu shows only the actions that apply. Each line shows its direct key, if it has one. Move with `↑` `↓` or `j` `k`, and push `enter` to run the action. You can also push the direct key of an action. Push `esc` to close the menu. An action that needs the Web API shows "needs L login" when you are not logged in.

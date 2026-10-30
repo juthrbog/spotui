@@ -104,6 +104,11 @@ func (p *tracksPage) update(m *Model, msg tea.Msg) tea.Cmd {
 		case p.resp != nil:
 			p.rebuild(m)
 		}
+	case playlistAddMsg:
+		if msg.err == nil && msg.playlistURI == p.uri {
+			// go-librespot dropped its copy of the playlist.
+			return p.reload(m)
+		}
 	case tea.KeyPressMsg:
 		if p.filter.typing {
 			return p.filter.update(&p.list, msg)

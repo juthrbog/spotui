@@ -33,6 +33,9 @@ func actionsFor(item *row, liked map[string]bool) []action {
 	if isTrackURI(item.uri) {
 		out = append(out, action{label: likeLabel(liked, item.uri), key: "l", run: (*Model).toggleLikeOf})
 	}
+	if canAddToPlaylist(item) {
+		out = append(out, action{label: "Add to playlist", run: (*Model).openPlaylistPicker})
+	}
 	if isAlbumURI(item.uri) {
 		out = append(out, action{label: "Play", run: func(m *Model, item *row) tea.Cmd { return m.play(item.uri, "") }})
 	} else if item.album.uri != "" {

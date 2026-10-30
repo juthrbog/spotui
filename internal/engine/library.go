@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	librespot "github.com/devgianlu/go-librespot"
 	"github.com/devgianlu/go-librespot/daemon"
@@ -16,21 +17,48 @@ import (
 // request.
 const maxLibraryURIs = 50
 
-// canonicalTrackURIs checks that uris holds 1 to 50 track URIs and returns
-// them in canonical form.
-func canonicalTrackURIs(uris []string) ([]string, error) {
+// canonicalURIs checks that uris holds 1 to 50 URIs of the given types and
+// returns them in canonical form.
+func canonicalURIs(uris []string, types ...librespot.SpotifyIdType) ([]string, error) {
 	if len(uris) == 0 || len(uris) > maxLibraryURIs {
-		return nil, fmt.Errorf("need 1 to %d track URIs, got %d", maxLibraryURIs, len(uris))
+		return nil, fmt.Errorf("need 1 to %d URIs, got %d", maxLibraryURIs, len(uris))
 	}
 	out := make([]string, len(uris))
 	for i, uri := range uris {
 		id, err := librespot.SpotifyIdFromUri(uri)
-		if err != nil || id.Type() != librespot.SpotifyIdTypeTrack {
-			return nil, fmt.Errorf("not a track URI: %q", uri)
+		if err != nil || !slices.Contains(types, id.Type()) {
+			return nil, fmt.Errorf("not a %s URI: %q", types[0], uri)
 		}
 		out[i] = id.Uri()
 	}
 	return out, nil
+}
+
+func canonicalTrackURIs(uris []string) ([]string, error) {
+	return canonicalURIs(uris, librespot.SpotifyIdTypeTrack)
+}
+
+// checkPlaylistURI checks that uri names a playlist.
+func checkPlaylistURI(uri string) error {
+	id, err := librespot.SpotifyIdFromUri(uri)
+	if err != nil || id.Type() != librespot.SpotifyIdTypePlaylist {
+		return fmt.Errorf("not a playlist URI: %q", uri)
+	}
+	return nil
+}
+
+// PlaylistAddTracks adds tracks or episodes to the end of a playlist. A
+// playlist that the user cannot change gives an error that wraps
+// daemon.ErrForbidden.
+func (e *Engine) PlaylistAddTracks(ctx context.Context, playlistURI string, uris []string) error {
+	if err := checkPlaylistURI(playlistURI); err != nil {
+		return err
+	}
+	if _, err := canonicalURIs(uris, librespot.SpotifyIdTypeTrack, librespot.SpotifyIdTypeEpisode); err != nil {
+		return err
+	}
+	_, err := e.call(ctx, daemon.ApiRequestTypePlaylistAddTracks, daemon.ApiPlaylistAddTracks{PlaylistUri: playlistURI, Uris: uris})
+	return err
 }
 
 // SetLiked adds the tracks to Liked Songs, or removes them when liked is
