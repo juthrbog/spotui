@@ -25,12 +25,12 @@ func TestActionsForItemTypes(t *testing.T) {
 		item row
 		want string
 	}{
-		{"track", trackRow(trackTwo), "Like or unlike, Go to album, Go to artist"},
-		{"liked track", trackRow(trackOne), "Unlike, Go to album, Go to artist"},
+		{"track", trackRow(trackTwo), "Like or unlike, Add to playlist, Go to album, Go to artist"},
+		{"liked track", trackRow(trackOne), "Unlike, Add to playlist, Go to album, Go to artist"},
 		{"album", albumRow(webapi.Album{URI: "spotify:album:a", Name: "Rec", Artists: []webapi.Artist{{URI: "spotify:artist:b", Name: "Band"}}}), "Play, Go to artist"},
 		{"album without artist links", albumRow(webapi.Album{URI: "spotify:album:a", Name: "Rec"}), "Play"},
-		{"episode", row{uri: "spotify:episode:e", album: ref{uri: "spotify:show:s", name: "Show"}}, "Go to album"},
-		{"track still loading", row{uri: "spotify:track:9"}, "Like or unlike"},
+		{"episode", row{uri: "spotify:episode:e", album: ref{uri: "spotify:show:s", name: "Show"}}, "Add to playlist, Go to album"},
+		{"track still loading", row{uri: "spotify:track:9"}, "Like or unlike, Add to playlist"},
 	}
 	liked := map[string]bool{trackOne.Uri: true}
 	for _, c := range cases {
@@ -59,7 +59,8 @@ func TestMenuRunsActionForSelectedTrack(t *testing.T) {
 		}
 	}
 
-	pressKey(m, 'j')
+	pressKey(m, 'j') // Add to playlist
+	pressKey(m, 'j') // Go to album
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.menu != nil {
 		t.Error("menu is still open after enter")

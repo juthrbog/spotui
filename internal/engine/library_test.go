@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -48,5 +49,25 @@ func TestLibraryWrappersCheckBeforeSending(t *testing.T) {
 	}
 	if _, err := e.LikedStates(ctx, []string{"spotify:album:4uLU6hMCjMI75M1A2tKUQC"}); err == nil || err == context.Canceled {
 		t.Errorf("LikedStates(album) = %v, want a check error", err)
+	}
+	const (
+		playlist = "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M"
+		track    = "spotify:track:4uLU6hMCjMI75M1A2tKUQC"
+	)
+	bad := map[string][2]any{
+		"album as playlist":  {"spotify:album:4uLU6hMCjMI75M1A2tKUQC", []string{track}},
+		"Liked Songs":        {"spotify:user:jakob:collection", []string{track}},
+		"no items":           {playlist, []string(nil)},
+		"album as item":      {playlist, []string{"spotify:album:4uLU6hMCjMI75M1A2tKUQC"}},
+		"local file as item": {playlist, []string{"spotify:local:a:b:c:1"}},
+	}
+	for name, in := range bad {
+		if err := e.PlaylistAddTracks(ctx, in[0].(string), in[1].([]string)); err == nil || err == context.Canceled {
+			t.Errorf("PlaylistAddTracks %s = %v, want a check error", name, err)
+		}
+	}
+	// An episode is allowed, so the request gets to the (missing) player.
+	if err := e.PlaylistAddTracks(ctx, playlist, []string{"spotify:episode:4uLU6hMCjMI75M1A2tKUQC"}); !errors.Is(err, context.Canceled) {
+		t.Errorf("PlaylistAddTracks with an episode = %v, want the error of the canceled context", err)
 	}
 }

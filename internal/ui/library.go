@@ -64,6 +64,16 @@ func (p *libraryPage) update(m *Model, msg tea.Msg) tea.Cmd {
 		p.playlistsLoading = false
 		p.playlists, p.playlistsErr = msg.items, msg.err
 		p.rebuild(m)
+	case playlistAddMsg:
+		// Count the new item, so the row does not wait for the next R.
+		if msg.err == nil {
+			for i := range p.playlists {
+				if p.playlists[i].Uri == msg.playlistURI {
+					p.playlists[i].Length++
+				}
+			}
+			p.rebuild(m)
+		}
 	case albumsMsg:
 		p.albumsLoading = false
 		p.albums, p.albumsErr = msg.items, msg.err
@@ -116,26 +126,7 @@ func (p *libraryPage) rebuild(m *Model) {
 		rows = append(rows, note("No playlists."))
 	}
 	for _, pl := range p.playlists {
-		name := pl.Name
-		if len(pl.Folder) > 0 {
-			name = strings.Join(pl.Folder, " / ") + " / " + name
-		}
-		owner, kind := "", "Playlist"
-		if len(pl.Folder) > 0 {
-			kind += " in " + strings.Join(pl.Folder, " / ")
-		}
-		if pl.OwnerUsername != "" && pl.OwnerUsername != username {
-			owner = "by " + pl.OwnerUsername
-			kind += " · " + owner
-		}
-		count := plural(int(pl.Length), "track")
-		rows = append(rows, row{
-			cols:  []string{name, owner, count},
-			uri:   pl.Uri,
-			label: pl.Name,
-			image: deref(pl.ImageUrl),
-			info:  []string{pl.Name, kind, count},
-		})
+		rows = append(rows, playlistRow(pl, username))
 	}
 
 	rows = append(rows, row{kind: rowHeader}, row{kind: rowHeader, cols: []string{"Albums"}})
@@ -165,6 +156,31 @@ func (p *libraryPage) view(m *Model, width, height int) string {
 }
 
 func note(text string) row { return row{kind: rowNote, cols: []string{text}} }
+
+// playlistRow returns the list row of a playlist in the library of the
+// user with the name username.
+func playlistRow(pl daemon.ApiLibraryPlaylist, username string) row {
+	name := pl.Name
+	if len(pl.Folder) > 0 {
+		name = strings.Join(pl.Folder, " / ") + " / " + name
+	}
+	owner, kind := "", "Playlist"
+	if len(pl.Folder) > 0 {
+		kind += " in " + strings.Join(pl.Folder, " / ")
+	}
+	if pl.OwnerUsername != "" && pl.OwnerUsername != username {
+		owner = "by " + pl.OwnerUsername
+		kind += " · " + owner
+	}
+	count := plural(int(pl.Length), "track")
+	return row{
+		cols:  []string{name, owner, count},
+		uri:   pl.Uri,
+		label: pl.Name,
+		image: deref(pl.ImageUrl),
+		info:  []string{pl.Name, kind, count},
+	}
+}
 
 // albumRow returns the list row of a Web API album. The album links to
 // itself, so go to album opens it.
