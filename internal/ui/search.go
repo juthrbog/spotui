@@ -160,11 +160,14 @@ func (p *searchPage) rebuild() {
 		for _, t := range res.Tracks.Items {
 			artists := webapi.ArtistNames(t.Artists)
 			rows = append(rows, row{
-				cols:  []string{t.Name, artists, t.Album.Name, formatMs(int64(t.DurationMs))},
-				uri:   t.URI,
-				play:  true,
-				image: webapi.PickImage(t.Album.Images),
-				info:  []string{t.Name, artists, t.Album.Name},
+				cols:    []string{t.Name, artists, t.Album.Name, formatMs(int64(t.DurationMs))},
+				uri:     t.URI,
+				label:   t.Name,
+				play:    true,
+				image:   webapi.PickImage(t.Album.Images),
+				info:    []string{t.Name, artists, t.Album.Name},
+				album:   ref{uri: t.Album.URI, name: t.Album.Name},
+				artists: artistRefs(t.Artists),
 			})
 		}
 	}

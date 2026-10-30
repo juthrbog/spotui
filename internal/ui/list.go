@@ -30,6 +30,10 @@ type row struct {
 	label string // title for a page opened from this row
 	play  bool   // enter plays the URI instead of opening it
 
+	// Links of a track, for go to album and go to artist.
+	album   ref
+	artists []ref
+
 	// Shown in the side panel.
 	image string   // cover art URL
 	glyph string   // symbol shown when there is no image

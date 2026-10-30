@@ -153,6 +153,7 @@ Spotify sets these limits on apps in development mode:
 | `g` / `G` | First or last item |
 | `pgup` / `pgdown` | Page up or down |
 | `enter` | Open the selected item, or play it |
+| `A` / `I` | Go to the album or the artist of the track |
 | `esc` | Go back, or clear the filter |
 | `1` / `2` / `tab` | Library tab or Search tab |
 | `f` | Filter the list on screen |
@@ -163,6 +164,8 @@ Spotify sets these limits on apps in development mode:
 | `q` | Quit |
 
 To filter a list, push `f` and type. The list shows only the items that contain every word that you type, for example `beatles abbey`. The filter works in the Library tab and in each track list. It uses no Web API calls. Push `enter` to keep the filter and go to the list, or push `esc` to clear it.
+
+`A` and `I` apply to the selected track. If no track is selected, they apply to the song that plays. If the track has more than one artist, `I` shows a list of the artists. Select one and push `enter`.
 
 To search, push `/`, type the search, and push `enter`. While you type, the keys go into the search box. To stop typing, push `esc` or `tab`. In the results, push `esc` to type again.
 
