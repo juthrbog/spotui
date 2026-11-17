@@ -63,7 +63,7 @@ func trackRow(t *daemon.ApiTrack) row {
 // pick. It returns nil when there is no such item.
 func (m *Model) actionItem() *row {
 	sel := m.current().selection()
-	if _, ok := m.current().(*tracksPage); ok || (sel != nil && (isTrackURI(sel.uri) || isAlbumURI(sel.uri))) {
+	if trackList(m.current()) || (sel != nil && (isTrackURI(sel.uri) || isAlbumURI(sel.uri))) {
 		return sel
 	}
 	if m.status == nil || m.status.Track == nil {
@@ -71,6 +71,15 @@ func (m *Model) actionItem() *row {
 	}
 	r := trackRow(m.status.Track)
 	return &r
+}
+
+// trackList reports whether p lists tracks: a track list or the queue.
+func trackList(p page) bool {
+	switch p.(type) {
+	case *tracksPage, *queuePage:
+		return true
+	}
+	return false
 }
 
 func (m *Model) goToAlbum() tea.Cmd  { return m.goToAlbumOf(m.actionItem()) }

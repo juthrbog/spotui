@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	librespot "github.com/devgianlu/go-librespot"
@@ -19,6 +20,24 @@ func (e *Engine) Status(ctx context.Context) (*daemon.ApiStatus, error) {
 		return nil, fmt.Errorf("unexpected status reply %T", resp)
 	}
 	return st, nil
+}
+
+// Queue returns the play order around the current track: up to 32 tracks
+// before it and after it, the queued tracks first among the next ones.
+// Without a session, the queue is empty.
+func (e *Engine) Queue(ctx context.Context) (*daemon.ApiQueue, error) {
+	resp, err := e.call(ctx, daemon.ApiRequestTypeGetQueue, nil)
+	if errors.Is(err, daemon.ErrNoSession) {
+		return &daemon.ApiQueue{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	q, ok := resp.(*daemon.ApiQueue)
+	if !ok {
+		return nil, fmt.Errorf("unexpected queue reply %T", resp)
+	}
+	return q, nil
 }
 
 // Play plays a track, album, playlist, or artist URI. If skipTo is set, the
@@ -103,7 +122,7 @@ func (e *Engine) LibraryPlaylists(ctx context.Context) ([]daemon.ApiLibraryPlayl
 	var all []daemon.ApiLibraryPlaylist
 	for {
 		resp, err := e.call(ctx, daemon.ApiRequestTypeLibraryPlaylists,
-			daemon.ApiRequestDataLibraryPlaylists{Offset: len(all), Limit: pageSize})
+			daemon.ApiRequestDataLibraryPage{Offset: len(all), Limit: pageSize})
 		if err != nil {
 			return nil, err
 		}

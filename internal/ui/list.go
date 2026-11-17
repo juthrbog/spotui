@@ -34,6 +34,7 @@ type row struct {
 	album   ref
 	pos     int // position in the full track list, for remove from playlist
 	artists []ref
+	slot    queueSlot // section in the queue tab
 
 	// Shown in the side panel.
 	image string   // cover art URL
