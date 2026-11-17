@@ -9,7 +9,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4
 	github.com/charmbracelet/x/ansi v0.11.9
-	github.com/devgianlu/go-librespot v0.10.5
+	github.com/devgianlu/go-librespot v0.10.6
 	golang.org/x/image v0.47.0
 	golang.org/x/oauth2 v0.37.0
 )
@@ -33,7 +33,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/jfreymuth/pulse v0.1.2-0.20241102120944-4ffb35054b53 // indirect
+	github.com/jfreymuth/pulse v0.1.3 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/mattn/go-runewidth v0.0.30 // indirect
 	github.com/miekg/dns v1.1.69 // indirect

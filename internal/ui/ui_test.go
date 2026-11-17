@@ -189,8 +189,8 @@ func TestSearchInputCanAlwaysBeLeft(t *testing.T) {
 	if m.search.typing() {
 		t.Error("tab did not leave the search box")
 	}
-	if m.tab != tabLibrary {
-		t.Errorf("tab did not switch to the library, tab = %d", m.tab)
+	if m.tab != tabQueue {
+		t.Errorf("tab did not switch to the queue, tab = %d", m.tab)
 	}
 }
 

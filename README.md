@@ -166,7 +166,7 @@ Spotify sets these limits on apps in development mode:
 | `A` / `I` | Go to the album or the artist of the track |
 | `o` | Go to the playlist, album, or artist that plays |
 | `esc` | Go back, or clear the filter |
-| `1` / `2` / `tab` | Library tab or Search tab |
+| `1` / `2` / `3` / `tab` | Library tab, Search tab, or Queue tab |
 | `f` | Filter the list on screen |
 | `/` | Search all of Spotify |
 | `R` | Load the library again |
@@ -174,7 +174,7 @@ Spotify sets these limits on apps in development mode:
 | `?` | Show all keys |
 | `q` | Quit |
 
-To filter a list, push `f` and type. The list shows only the items that contain every word that you type, for example `beatles abbey`. The filter works in the Library tab and in each track list. It uses no Web API calls. Push `enter` to keep the filter and go to the list, or push `esc` to clear it.
+To filter a list, push `f` and type. The list shows only the items that contain every word that you type, for example `beatles abbey`. The filter works in the Library tab, the Queue tab, and each track list. It uses no Web API calls. Push `enter` to keep the filter and go to the list, or push `esc` to clear it.
 
 Push `l` to add the track to Liked Songs. If the track is in Liked Songs, `l` removes it. A message shows the result. The now-playing bar and the track lists show ♥ for liked songs. A track list loads the hearts after it shows the tracks. Liked Songs shows no hearts, because all of its songs are liked. Liking works without the Web API.
 
@@ -182,7 +182,9 @@ To add a song or an episode to a playlist, select it, push `a`, and select "Add 
 
 To remove a song or an episode from a playlist that you can change, open the playlist, select the item, push `a`, and select "Remove from this playlist". spotui asks first, because adding the item again changes its position and date. Push `y` to remove the item, or `n` to keep it. If the playlist has the item more than one time, spotui removes only the selected copy. spotui cannot remove such a copy if a local file comes before it in the playlist, or if the playlist changed in another app in the last few minutes. In that case spotui removes nothing and tells you. Use the Spotify app to remove that copy.
 
-Push `e` to add a song or an episode to the end of the queue. Queued items play in the order that you add them, after the song that plays now and before the rest of the playlist or album. If nothing plays, `e` plays the item at once. The now-playing bar shows the next track when spotui knows it. spotui cannot show the full queue or remove items from it yet.
+Push `e` to add a song or an episode to the end of the queue. Queued items play in the order that you add them, after the song that plays now and before the rest of the playlist or album. If nothing plays, `e` plays the item at once. The now-playing bar shows the next track when spotui knows it.
+
+Push `3` to open the Queue tab. It shows the song that plays, the songs that you queued, and the next songs of the playlist or album. When the playlist or album ends and autoplay is on, the tab also shows the songs that autoplay picked. The tab shows up to 32 next songs. It changes when the queue changes, also when you change the queue in another Spotify app. Select a song of the playlist or album and push `enter` to skip to it. The queued songs stay in the queue. `a`, `e`, `l`, `A`, and `I` apply to the selected song. spotui cannot jump to a queued song, remove a song from the queue, or change the order yet. Use `n` to skip to the next song.
 
 To save an album to your library, select the album or one of its songs, push `a`, and select "Save album". If the album is in your library, the menu shows "Remove album". The Library tab shows the change. Saving albums needs the Web API.
 
@@ -275,6 +277,7 @@ Run one copy of spotui at a time. Two copies use the same device ID, and Spotify
 - spotui loads 500 saved albums at most.
 - An artist page shows 50 items at most in each section. The Web API gives 10 albums at most in each call, so this keeps the number of calls low.
 - A track list shows 800 tracks at most.
+- The Queue tab shows 32 next tracks at most, because go-librespot gives no more.
 - Search does not find playlists that Spotify made, such as Discover Weekly. spotui shows them only if they are in your library.
 
 ## How it works

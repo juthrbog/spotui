@@ -30,6 +30,8 @@ type tab int
 const (
 	tabLibrary tab = iota
 	tabSearch
+	tabQueue
+	tabCount
 )
 
 // page is one screen in a tab. Each tab keeps a stack of pages; esc goes back.
@@ -51,9 +53,10 @@ type Model struct {
 
 	width, height int
 	tab           tab
-	stacks        [2][]page
+	stacks        [tabCount][]page
 	library       *libraryPage
 	search        *searchPage
+	queue         *queuePage
 
 	status *daemon.ApiStatus
 	ready  bool // the player is logged in and answering
@@ -89,8 +92,10 @@ func New(ctx context.Context, eng *engine.Engine, web *webapi.Client, info Info)
 	}
 	m.library = newLibraryPage()
 	m.search = newSearchPage()
+	m.queue = newQueuePage()
 	m.stacks[tabLibrary] = []page{m.library}
 	m.stacks[tabSearch] = []page{m.search}
+	m.stacks[tabQueue] = []page{m.queue}
 	return m
 }
 
@@ -143,6 +148,16 @@ func (m *Model) onStack(p page) bool {
 		}
 	}
 	return false
+}
+
+// switchTab shows tab t. The queue tab loads the queue when it changed
+// since the last load.
+func (m *Model) switchTab(t tab) tea.Cmd {
+	m.tab = t
+	if t == tabQueue && m.queue.stale {
+		return m.queue.load(m)
+	}
+	return nil
 }
 
 func (m *Model) setFlash(text string, isErr bool) tea.Cmd {
@@ -304,8 +319,13 @@ func (m *Model) handleEngineEvent(ev any) tea.Cmd {
 	case engine.Stopped:
 		m.ready = false
 		m.status = nil
+		m.queue.stale = true
 		return m.setFlash(fmt.Sprintf("Player stopped: %v. Restarting in %s.", ev.Err, ev.Retry), true)
 	case *daemon.ApiEvent:
+		if ev.Type == daemon.ApiEventTypeQueue {
+			// The status has the next track, which the queue change can move.
+			return tea.Batch(m.queue.changed(m), fetchStatus(m.ctx, m.eng, false))
+		}
 		if ev.Type == daemon.ApiEventTypePlaybackError {
 			if data, ok := ev.Data.(daemon.ApiEventDataPlaybackError); ok {
 				return tea.Batch(m.setFlash("Playback error: "+data.Message, true), fetchStatus(m.ctx, m.eng, false))
@@ -333,6 +353,9 @@ func (m *Model) handleStatus(msg statusMsg) tea.Cmd {
 	if !m.ready {
 		m.ready = true
 		cmds = append(cmds, m.library.load(m))
+		if m.tab == tabQueue {
+			cmds = append(cmds, m.queue.load(m))
+		}
 		if m.web.Configured() && !m.web.LoggedIn() && !m.webLoginTried {
 			cmds = append(cmds, m.startWebLogin())
 		}
@@ -366,8 +389,11 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	// keyboard.
 	if key == "tab" || key == "shift+tab" {
 		m.current().stopTyping()
-		m.tab = 1 - m.tab
-		return nil
+		step := tab(1)
+		if key == "shift+tab" {
+			step = tabCount - 1
+		}
+		return m.switchTab((m.tab + step) % tabCount)
 	}
 
 	cur := m.current()
@@ -409,9 +435,11 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return m.control(func(ctx context.Context) error { return m.eng.SetRepeat(ctx, next) })
 	case "1":
-		m.tab = tabLibrary
+		return m.switchTab(tabLibrary)
 	case "2":
-		m.tab = tabSearch
+		return m.switchTab(tabSearch)
+	case "3":
+		return m.switchTab(tabQueue)
 	case "/":
 		m.tab = tabSearch
 		m.stacks[tabSearch] = m.stacks[tabSearch][:1]
@@ -509,7 +537,7 @@ func (m *Model) render() string {
 }
 
 func (m *Model) headerView(w int) string {
-	tabs := []string{"1 Library", "2 Search"}
+	tabs := []string{"1 Library", "2 Search", "3 Queue"}
 	for i, t := range tabs {
 		if tab(i) == m.tab {
 			tabs[i] = styleTabActive.Render(t)
@@ -684,7 +712,7 @@ func helpView() string {
 		{"o", "go to the playlist, album, or artist that plays"},
 		{"esc", "go back, stop typing, or clear the filter"},
 		{"", ""},
-		{"1 / 2 / tab", "library / search"},
+		{"1 / 2 / 3 / tab", "library / search / queue"},
 		{"f", "filter the list on screen"},
 		{"/", "search all of Spotify"},
 		{"R", "reload library"},
