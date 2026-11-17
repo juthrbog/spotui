@@ -75,7 +75,9 @@ func (e *Engine) Next(ctx context.Context) error {
 // Prev goes to the previous track, or to the start of the current track if
 // it has played for more than a few seconds.
 func (e *Engine) Prev(ctx context.Context) error {
-	_, err := e.call(ctx, daemon.ApiRequestTypePrev, nil)
+	// go-librespot v0.10.6 reads ApiPrev without a check, so nil data
+	// panics the player and ends spotui.
+	_, err := e.call(ctx, daemon.ApiRequestTypePrev, daemon.ApiPrev{})
 	return err
 }
 
