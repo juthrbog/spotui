@@ -10,8 +10,8 @@ require (
 	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/devgianlu/go-librespot v0.10.6
-	golang.org/x/image v0.47.0
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/image v0.48.0
+	golang.org/x/oauth2 v0.38.0
 )
 
 require (
@@ -47,15 +47,15 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/xlab/vorbis-go v0.0.0-20210911202351-b5b85f1ec645 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9 // indirect
-	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
-	golang.org/x/tools v0.50.0 // indirect
-	golang.org/x/vuln v1.8.0 // indirect
+	golang.org/x/mod v0.42.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/telemetry v0.0.0-20261010193011-f71dc92da45e // indirect
+	golang.org/x/tools v0.52.0 // indirect
+	golang.org/x/vuln v1.9.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
